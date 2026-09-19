@@ -1,7 +1,9 @@
-/* js/main.js — versão corrigida
+/* js/main.js — v2
  *
- * Regra geral: nada aqui pode falhar em silêncio. Se algo quebrar, a tela de
- * carregamento vira uma tela de erro legível em vez de girar para sempre.
+ * Novidades desta versão:
+ *  - faz a "ponte" automática de globais declarados com const para window
+ *  - checa também DOOR_HITBOXES (usado por ui.js) e as chaves de GAME_CONSTANTS
+ *  - avisa se OFFICE_WORLD_WIDTH não bate com VIEWS.length × INTERNAL_WIDTH
  */
 (function bootstrap() {
   'use strict';
@@ -25,19 +27,49 @@
     if (el) el.classList.add('hidden');
   }
 
-  function fatal(message, error) {
-    console.error('[bootstrap]', message, error || '');
+  function fatal(html) {
+    console.error('[bootstrap]', html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
     if (!loadingScreen) return;
     loadingScreen.classList.remove('hidden');
     loadingScreen.innerHTML =
       '<h1>Não foi possível carregar</h1>' +
-      `<p style="max-width:44ch;text-align:center;line-height:1.5">${message}</p>` +
+      `<p style="max-width:46ch;text-align:center;line-height:1.5">${html}</p>` +
       '<p><small>Abra o console (F12 → Console) para ver o erro completo.</small></p>';
   }
 
-  // ------------------------------------------- 1) os scripts existem mesmo?
-  // typeof em identificador não declarado é seguro; o try cobre o caso de um
-  // arquivo ter quebrado no meio e deixado a const em TDZ.
+  // ---------------------------------------- 1) ponte const → window
+  // Em <script> clássico, `const X = ...` NÃO cria window.X. Como game.js e
+  // ui.js leem window.VIEWS, window.Progression etc., se o arquivo de origem
+  // esqueceu o `window.X = X`, o global "some". Aqui a gente conserta e avisa.
+  const bridged = [];
+  function bridge(name, readLexical) {
+    if (typeof window[name] !== 'undefined') return;
+    let value;
+    try { value = readLexical(); } catch (e) { return; } // nem existe: segue o baile
+    if (value === undefined) return;
+    window[name] = value;
+    bridged.push(name);
+  }
+
+  bridge('ASSETS',         () => ASSETS);
+  bridge('GAME_CONSTANTS', () => GAME_CONSTANTS);
+  bridge('VIEWS',          () => VIEWS);
+  bridge('ROOMS',          () => ROOMS);
+  bridge('DOORS_CONFIG',   () => DOORS_CONFIG);
+  bridge('DOOR_HITBOXES',  () => DOOR_HITBOXES);
+  bridge('ENEMIES_CONFIG', () => ENEMIES_CONFIG);
+  bridge('NIGHTS_CONFIG',  () => NIGHTS_CONFIG);
+  bridge('Progression',    () => Progression);
+
+  if (bridged.length) {
+    console.warn(
+      '[bootstrap] Estes globais existiam como const mas não estavam em window. ' +
+      'Exportei por você, mas o certo é adicionar `window.X = X;` no arquivo de origem:',
+      bridged,
+    );
+  }
+
+  // ------------------------------------------- 2) os scripts existem mesmo?
   const deps = {
     UI:              () => typeof UI,
     Game:            () => typeof Game,
@@ -51,6 +83,7 @@
     VIEWS:           () => typeof window.VIEWS,
     ROOMS:           () => typeof window.ROOMS,
     DOORS_CONFIG:    () => typeof window.DOORS_CONFIG,
+    DOOR_HITBOXES:   () => typeof window.DOOR_HITBOXES,
     ENEMIES_CONFIG:  () => typeof window.ENEMIES_CONFIG,
     NIGHTS_CONFIG:   () => typeof window.NIGHTS_CONFIG,
     Progression:     () => typeof window.Progression,
@@ -62,16 +95,37 @@
 
   if (missing.length) {
     fatal(
-      `Estes scripts não definiram nada: <b>${missing.join(', ')}</b>.<br>` +
-      'Confira a aba Network por 404 e lembre que o GitHub Pages diferencia ' +
-      'maiúsculas de minúsculas nos nomes de arquivo.',
+      `Faltando: <b>${missing.join(', ')}</b>.<br>` +
+      'Veja a aba Network por 404 e confira se o arquivo de origem faz ' +
+      '<code>window.X = X;</code> no final.',
     );
     return;
   }
 
   if (!canvas) { fatal('O elemento &lt;canvas id="game-canvas"&gt; não foi encontrado.'); return; }
 
-  // --------------------------------------------------------- 2) música do menu
+  // ------------------------------- 3) constantes faltando viram NaN silencioso
+  const CONST_KEYS = [
+    'INTERNAL_WIDTH', 'INTERNAL_HEIGHT', 'OFFICE_WORLD_WIDTH', 'VIEW_SMOOTHING',
+    'AI_TICK_INTERVAL_MS', 'NIGHT_DURATION_MS', 'HOURS_PER_NIGHT',
+    'STATIC_NOISE_DENSITY', 'JITTER_MAX_PX', 'CAMERA_STATIC_FLASH_MS',
+    'INFINITE_START_LEVEL', 'INFINITE_MAX_LEVEL', 'INFINITE_RAMP_MS', 'INFINITE_POWER_MULT',
+  ];
+  const missingConsts = CONST_KEYS.filter((k) => window.GAME_CONSTANTS[k] === undefined);
+  if (missingConsts.length) {
+    console.warn('[bootstrap] GAME_CONSTANTS sem estas chaves (viram NaN em silêncio):', missingConsts);
+  }
+
+  const expectedWorld = window.VIEWS.length * window.GAME_CONSTANTS.INTERNAL_WIDTH;
+  if (window.GAME_CONSTANTS.OFFICE_WORLD_WIDTH !== expectedWorld) {
+    console.warn(
+      `[bootstrap] OFFICE_WORLD_WIDTH = ${window.GAME_CONSTANTS.OFFICE_WORLD_WIDTH}, ` +
+      `mas VIEWS.length × INTERNAL_WIDTH = ${expectedWorld}. ` +
+      'O escritório vai desalinhar ao virar para os lados.',
+    );
+  }
+
+  // --------------------------------------------------------- 4) música do menu
   const BEATBOX_SRC = 'assets/audio/sfx/beatbox.mp3';
   const beatboxMusic = new Audio(BEATBOX_SRC);
   beatboxMusic.loop = true;
@@ -91,7 +145,6 @@
     if (p && p.catch) p.catch(() => bindFirstGesture());
   }
 
-  // Autoplay bloqueado: espera o primeiro clique/tecla do usuário.
   function bindFirstGesture() {
     if (gestureBound) return;
     gestureBound = true;
@@ -103,8 +156,6 @@
     document.body.addEventListener('keydown', unlock, { once: true });
   }
 
-  // Antes isto fazia `src = ''`, o que faz o navegador tentar baixar a própria
-  // página como áudio e jogar um erro no console. Pausar já basta.
   function stopMenuMusic() {
     musicStopped = true;
     try { beatboxMusic.pause(); beatboxMusic.currentTime = 0; } catch (e) { console.warn(e); }
@@ -120,8 +171,8 @@
 
   function goToMenu() {
     if (game) {
-      game.state = 'menu';                 // derruba qualquer loop de render ainda vivo
-      if (game.assetLoader.stopAll) game.assetLoader.stopAll();  // corta a ambiência
+      game.state = 'menu';
+      if (game.assetLoader.stopAll) game.assetLoader.stopAll();
     }
     hide('hud');
     hide('office-controls');
@@ -132,12 +183,10 @@
     UI.showScreen('menu-screen');
   }
 
-  // ------------------------------------------------------------ 3) carregar
+  // ------------------------------------------------------------ 5) carregar
   const loader = new AssetLoader();
   window.loader = loader;
 
-  // Rede de segurança: se em 15s nada tiver bootado, mostramos erro em vez de
-  // deixar "Carregando…" para sempre.
   const failsafe = setTimeout(() => {
     if (!booted) fatal('O carregamento demorou demais e foi interrompido.');
   }, 15000);
@@ -150,7 +199,8 @@
     .then(start)
     .catch((err) => {
       clearTimeout(failsafe);
-      fatal(`Erro ao iniciar o jogo: ${(err && err.message) || err}`, err);
+      fatal(`Erro ao iniciar o jogo: ${(err && err.message) || err}`);
+      console.error(err);
     });
 
   function start() {
@@ -174,7 +224,7 @@
     setTimeout(playMenuMusic, 200);
   }
 
-  // -------------------------------------------------------------- 4) botões
+  // -------------------------------------------------------------- 6) botões
   function wireMenuButtons() {
     on('btn-start', 'click', () => {
       if (!game) return;
@@ -207,8 +257,7 @@
     });
     on('btn-menu-victory', 'click', goToMenu);
 
-    // Os botões "Voltar" do Custom Night e do Ranking não estavam ligados a nada.
-    // Se menuExtras.js já cuidar disso, apague este bloco.
+    // Se menuExtras.js já cuidar dos "Voltar", apague este bloco.
     document.querySelectorAll('[data-action="back-to-menu"]').forEach((btn) => {
       btn.addEventListener('click', goToMenu);
     });
