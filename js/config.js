@@ -62,6 +62,14 @@ const ASSETS = {
   },
 };
 
+// -----------------------------------------------------------------------
+// VIEWS — NOVO. game.js lê window.VIEWS[this.viewIndex] e ui.js lê
+// window.VIEWS.length; sem isso o "VIEWS is not defined" derruba o boot
+// inteiro. A ordem tem que bater com viewIndex=1 sendo o centro (é onde
+// startRun() sempre começa) e com os data-door="esquerda"/"direita" do HTML.
+// -----------------------------------------------------------------------
+const VIEWS = ['esquerda', 'centro', 'direita'];
+
 const ROOMS = [
   { id: 'cam1', label: 'Câm. 1' },
   { id: 'cam2', label: 'Câm. 2' },
@@ -77,6 +85,23 @@ const DOORS_CONFIG = [
   { id: 'esquerda', label: 'Porta Esquerda' },
   { id: 'direita', label: 'Porta Direita' },
 ];
+
+// -----------------------------------------------------------------------
+// DOOR_HITBOXES — NOVO. ui.js (renderOffice) lê window.DOOR_HITBOXES[door.id]
+// e espera { x, y, w, h } como FRAÇÕES (0–1): x/w são fração de
+// GAME_CONSTANTS.OFFICE_WORLD_WIDTH (o panorama de 1440px inteiro, não a
+// tela), y/h são fração de INTERNAL_HEIGHT (270px).
+//
+// Os valores abaixo são um ponto de partida funcional — cada porta cai
+// dentro do terço do mundo que corresponde à sua VIEW (esquerda: 0–480px,
+// direita: 960–1440px) — mas o alinhamento fino com o seu background.png
+// é visual: ajuste x/y/w/h olhando o jogo rodando até a hitbox (e o texto
+// da porta, desenhado por cima dela) encaixar no sprite.
+// -----------------------------------------------------------------------
+const DOOR_HITBOXES = {
+  esquerda: { x: 0.08, y: 0.30, w: 0.14, h: 0.55 },
+  direita:  { x: 0.78, y: 0.30, w: 0.14, h: 0.55 },
+};
 
 // Cada inimigo agora usa um GRAFO de nós (não mais uma lista linear).
 // graph[nó] = lista de próximos nós possíveis (escolha aleatória entre eles).
@@ -159,11 +184,27 @@ const GAME_CONSTANTS = {
   MOUSE_PAN_SMOOTHING: 0.12,
   JITTER_MAX_PX: 1.5,
   STATIC_NOISE_DENSITY: 45,
+
+  // NOVO — game.js faz cameraOffsetX += (target - offset) * VIEW_SMOOTHING
+  // a cada frame. Sem essa chave o resultado é NaN e o escritório some da
+  // tela ao virar (mas o boot em si não trava, por isso passava despercebido).
+  VIEW_SMOOTHING: 0.15,
+
+  // NOVO — game.js._currentNight() usa estas 4 chaves só quando mode==='infinite'
+  // (botão "Modo Infinito", liberado após terminar a Noite 5). Sem elas, o
+  // nível vira NaN assim que alguém entra nesse modo. Ajuste a progressão
+  // como quiser; estes são valores de partida razoáveis.
+  INFINITE_START_LEVEL: 1,
+  INFINITE_MAX_LEVEL: 10,
+  INFINITE_RAMP_MS: 60 * 1000,   // sobe 1 nível de agressão a cada 60s
+  INFINITE_POWER_MULT: 1.6,
 };
 
 window.ASSETS = ASSETS;
+window.VIEWS = VIEWS;
 window.ROOMS = ROOMS;
 window.DOORS_CONFIG = DOORS_CONFIG;
+window.DOOR_HITBOXES = DOOR_HITBOXES;
 window.ENEMIES_CONFIG = ENEMIES_CONFIG;
 window.NIGHTS_CONFIG = NIGHTS_CONFIG;
 window.GAME_CONSTANTS = GAME_CONSTANTS;
