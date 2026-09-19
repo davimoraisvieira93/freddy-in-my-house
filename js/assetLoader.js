@@ -1,117 +1,191 @@
-const AssetLoader = {
-  images: {},
-  audio: {},
+/* js/assetLoader.js — versão corrigida
+ *
+ * Mudanças em relação à versão antiga:
+ *  - virou CLASSE (main.js faz `new AssetLoader()`)
+ *  - loadAll(assets, onProgress) devolve PROMISE (main.js faz `.then()`)
+ *  - ganhou playSfx() / stopSfx() / stopAll(), que game.js chama
+ *  - getImage() só devolve a imagem se ela realmente carregou
+ */
+class AssetLoader {
+  constructor() {
+    this.images = {};
+    this.audio = {};
+    this.failed = [];
+    this._playing = new Set();
+  }
 
-  loadAll(onProgress, onComplete) {
-    let total = 0;
-    let loaded = 0;
-    let finished = false;
+  /**
+   * Carrega tudo e resolve quando terminar (ou quando estourar o timeout).
+   * Nunca rejeita: asset quebrado vira aviso no console, não trava o jogo.
+   * @param {object} assets  normalmente window.ASSETS
+   * @param {(done:number,total:number)=>void} [onProgress]
+   * @returns {Promise<AssetLoader>}
+   */
+  loadAll(assets, onProgress) {
+    const src = assets || window.ASSETS || {};
+    const jobs = [];
 
-    const checkDone = () => {
-      if (finished) return;
-      loaded++;
-      if (onProgress) onProgress(loaded, total);
-      if (loaded >= total) {
-        finished = true;
-        if (onComplete) onComplete();
+    const walkImages = (obj, target) => {
+      Object.keys(obj || {}).forEach((key) => {
+        const value = obj[key];
+        if (typeof value === 'string') {
+          jobs.push(this._loadImage(value, target, key));
+        } else if (value && typeof value === 'object') {
+          target[key] = {};
+          walkImages(value, target[key]);
+        }
+      });
+    };
+    walkImages(src.images, this.images);
+
+    Object.keys(src.audio || {}).forEach((key) => {
+      jobs.push(this._loadAudio(src.audio[key], key));
+    });
+
+    const total = jobs.length;
+    let done = 0;
+    const tick = () => {
+      done += 1;
+      if (typeof onProgress === 'function') {
+        try { onProgress(done, total); } catch (e) { console.warn('[AssetLoader] onProgress falhou:', e); }
       }
     };
+    jobs.forEach((p) => p.then(tick));
 
-    // Conta quantas imagens existem na config
-    if (window.ASSETS && window.ASSETS.images) {
-      const countImages = (obj) => {
-        for (let k in obj) {
-          if (typeof obj[k] === 'string') total++;
-          else if (typeof obj[k] === 'object' && obj[k] !== null) countImages(obj[k]);
+    // Promise.resolve() garante que o .then() do chamador rode sempre de forma
+    // assíncrona, mesmo quando não há nenhum asset para carregar.
+    return Promise.resolve()
+      .then(() => Promise.all(jobs))
+      .then(() => {
+        if (this.failed.length) {
+          console.warn(`[AssetLoader] ${this.failed.length} asset(s) não carregaram:`, this.failed);
         }
+        return this;
+      });
+  }
+
+  _loadImage(url, target, key) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      target[key] = img;
+
+      let settled = false;
+      let timer = null;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (!ok) this.failed.push(url);
+        resolve();
       };
-      countImages(window.ASSETS.images);
-    }
 
-    // Conta quantos áudios existem na config
-    if (window.ASSETS && window.ASSETS.audio) {
-      for (let k in window.ASSETS.audio) {
-        total++;
-      }
-    }
+      img.addEventListener('load', () => finish(true), { once: true });
+      img.addEventListener('error', () => finish(false), { once: true });
+      img.src = url;
 
-    if (total === 0) {
-      if (onComplete) onComplete();
-      return;
-    }
+      // Se o download demorar demais, seguimos em frente. A imagem continua
+      // baixando em segundo plano e getImage() passa a devolvê-la quando ficar pronta.
+      timer = setTimeout(() => finish(true), AssetLoader.TIMEOUT_MS);
+    });
+  }
 
-    // Carrega imagens com segurança (se falhar 404, avança do mesmo jeito)
-    const loadImagesRecursive = (obj, targetObj) => {
-      for (let k in obj) {
-        if (typeof obj[k] === 'string') {
-          const img = new Image();
-          targetObj[k] = img;
-          
-          let resolved = false;
-          const resolveOnce = () => {
-            if (!resolved) {
-              resolved = true;
-              checkDone();
-            }
-          };
+  _loadAudio(url, key) {
+    return new Promise((resolve) => {
+      const snd = new Audio();
+      snd.preload = 'auto';
+      this.audio[key] = snd;
 
-          img.onload = resolveOnce;
-          img.onerror = resolveOnce; // Se der 404, pula e não trava o jogo
-          img.src = obj[k];
-
-          // Segurança extra: se demorar mais de 1.5s, força continuar
-          setTimeout(resolveOnce, 1500);
-
-        } else if (typeof obj[k] === 'object' && obj[k] !== null) {
-          targetObj[k] = {};
-          loadImagesRecursive(obj[k], targetObj[k]);
+      let settled = false;
+      let timer = null;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (!ok) {
+          this.failed.push(url);
+          this.audio[key] = null;
         }
-      }
-    };
+        resolve();
+      };
 
-    if (window.ASSETS && window.ASSETS.images) {
-      loadImagesRecursive(window.ASSETS.images, this.images);
-    }
+      // canplaythrough não dispara em vários navegadores móveis — loadeddata cobre isso.
+      snd.addEventListener('canplaythrough', () => finish(true), { once: true });
+      snd.addEventListener('loadeddata', () => finish(true), { once: true });
+      snd.addEventListener('error', () => finish(false), { once: true });
 
-    // Carrega áudios com segurança
-    if (window.ASSETS && window.ASSETS.audio) {
-      for (let k in window.ASSETS.audio) {
-        const snd = new Audio();
-        this.audio[k] = snd;
+      snd.src = url;
+      snd.load();
+      timer = setTimeout(() => finish(true), AssetLoader.TIMEOUT_MS);
+    });
+  }
 
-        let resolved = false;
-        const resolveOnce = () => {
-          if (!resolved) {
-            resolved = true;
-            checkDone();
-          }
-        };
-
-        snd.oncanplaythrough = resolveOnce;
-        snd.onerror = resolveOnce; // Se falhar o som, pula e não trava
-        snd.src = window.ASSETS.audio[k];
-
-        setTimeout(resolveOnce, 1500);
-      }
-    }
-  },
-
+  /** getImage('escritorio.centro') → HTMLImageElement pronta, ou null. */
   getImage(keyPath) {
-    const parts = keyPath.split('.');
-    let curr = this.images;
-    for (let i = 0; i < parts.length; i++) {
-      if (curr && curr[parts[i]] !== undefined) {
-        curr = curr[parts[i]];
-      } else {
-        return null;
-      }
-    }
-    return curr instanceof HTMLImageElement ? curr : null;
-  },
+    const node = String(keyPath || '')
+      .split('.')
+      .reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : null), this.images);
+
+    if (!(node instanceof HTMLImageElement)) return null;
+    return node.complete && node.naturalWidth > 0 ? node : null;
+  }
 
   getAudio(key) {
     return this.audio[key] || null;
   }
-};
+
+  /**
+   * playSfx('jumpscare', { volume: 1 })
+   * playSfx('ambience', { loop: true, volume: 0.5 })
+   * Sons pontuais tocam em cópias, então vários podem se sobrepor.
+   */
+  playSfx(key, options) {
+    const { loop = false, volume = 1, restart = true } = options || {};
+    const base = this.audio[key];
+    if (!base) {
+      console.warn(`[AssetLoader] som "${key}" não existe em ASSETS.audio`);
+      return null;
+    }
+
+    try {
+      if (loop) {
+        base.loop = true;
+        base.volume = volume;
+        if (restart) { try { base.currentTime = 0; } catch (e) { /* ainda não é seekable */ } }
+        const p = base.play();
+        if (p && p.catch) p.catch(() => {});
+        this._playing.add(base);
+        return base;
+      }
+
+      const shot = base.cloneNode(true);
+      shot.volume = volume;
+      const p = shot.play();
+      if (p && p.catch) p.catch(() => {});
+      this._playing.add(shot);
+      shot.addEventListener('ended', () => this._playing.delete(shot), { once: true });
+      return shot;
+    } catch (e) {
+      console.warn(`[AssetLoader] playSfx("${key}") falhou:`, e);
+      return null;
+    }
+  }
+
+  stopSfx(key) {
+    const snd = this.audio[key];
+    if (!snd) return;
+    try { snd.pause(); snd.currentTime = 0; } catch (e) { /* ignora */ }
+    this._playing.delete(snd);
+  }
+
+  /** Corta tudo — use ao voltar para o menu, senão a ambiência fica tocando. */
+  stopAll() {
+    this._playing.forEach((snd) => {
+      try { snd.pause(); snd.currentTime = 0; } catch (e) { /* ignora */ }
+    });
+    this._playing.clear();
+  }
+}
+
+AssetLoader.TIMEOUT_MS = 8000;
 
 window.AssetLoader = AssetLoader;
