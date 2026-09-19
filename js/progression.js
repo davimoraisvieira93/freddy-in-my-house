@@ -1,103 +1,51 @@
 /* js/progression.js
- *
- * Use este arquivo SÓ se o seu progression.js estiver dando 404 / não existir.
- * Se ele já existe, não substitua: basta garantir a última linha (window.Progression).
- *
- * A API abaixo é exatamente a que game.js e ui.js chamam hoje:
- *   Progression.addScore(ms)      → posição no ranking (1-based) ou null
- *   Progression.formatTime(ms)    → "MM:SS" ou "H:MM:SS"
- *   Progression.getLeaderboard()  → [{ ms, date }]
- *   Progression.unlock()          → true se destravou AGORA, false se já estava
- * Mais: isUnlocked() e clearLeaderboard(), que o menu costuma precisar.
- * Se o seu menuExtras.js chamar algum outro método, me diga qual.
+ * Desbloqueio de Custom Night / Modo Infinito e ranking do Modo Infinito,
+ * persistidos em localStorage.
  */
 const Progression = {
-  STORAGE_KEY: 'vigia-noturna:progress',
-  MAX_SCORES: 10,
+  _UNLOCK_KEY: 'vigianoturna:unlocked',
+  _SCORES_KEY: 'vigianoturna:scores',
 
-  // Modo anônimo / cookies bloqueados fazem localStorage lançar. Nesses casos
-  // o progresso vive só na memória da aba, mas o jogo não quebra.
-  _memory: null,
-
-  _default() {
-    return { unlocked: false, scores: [] };
-  },
-
-  _read() {
-    if (this._memory) return this._memory;
-    try {
-      const raw = localStorage.getItem(this.STORAGE_KEY);
-      if (!raw) return this._default();
-      const parsed = JSON.parse(raw);
-      return {
-        unlocked: parsed.unlocked === true,
-        scores: Array.isArray(parsed.scores) ? parsed.scores : [],
-      };
-    } catch (e) {
-      console.warn('[Progression] não consegui ler o progresso salvo:', e);
-      return this._default();
-    }
-  },
-
-  _write(state) {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
-      this._memory = null;
-    } catch (e) {
-      console.warn('[Progression] salvando só em memória:', e);
-      this._memory = state;
-    }
-  },
-
-  // ----------------------------------------------------------- desbloqueio
   isUnlocked() {
-    return this._read().unlocked === true;
+    return localStorage.getItem(this._UNLOCK_KEY) === '1';
   },
 
-  /** Retorna true apenas na primeira vez — game.js usa isso pra mudar o texto da vitória. */
+  /** Retorna true só na primeira vez que desbloqueia. */
   unlock() {
-    const state = this._read();
-    if (state.unlocked) return false;
-    state.unlocked = true;
-    this._write(state);
+    if (this.isUnlocked()) return false;
+    localStorage.setItem(this._UNLOCK_KEY, '1');
     return true;
   },
 
-  // -------------------------------------------------------------- ranking
-  getLeaderboard() {
-    return this._read().scores.slice();
+  formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
   },
 
-  /** No Modo Infinito, sobreviver MAIS tempo é melhor → ordem decrescente. */
+  getLeaderboard() {
+    try {
+      return JSON.parse(localStorage.getItem(this._SCORES_KEY)) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  /** Adiciona um tempo sobrevivido (ms) e retorna a posição (1-based) ou null. */
   addScore(ms) {
-    const state = this._read();
-    const entry = { ms: Math.round(ms || 0), date: Date.now() };
-
-    state.scores.push(entry);
-    state.scores.sort((a, b) => b.ms - a.ms);
-    const rank = state.scores.indexOf(entry) + 1;
-    state.scores = state.scores.slice(0, this.MAX_SCORES);
-
-    this._write(state);
-    return rank >= 1 && rank <= this.MAX_SCORES ? rank : null;
+    const list = this.getLeaderboard();
+    list.push(ms);
+    list.sort((a, b) => b - a);
+    const trimmed = list.slice(0, 10);
+    localStorage.setItem(this._SCORES_KEY, JSON.stringify(trimmed));
+    const rank = trimmed.indexOf(ms);
+    return rank === -1 ? null : rank + 1;
   },
 
   clearLeaderboard() {
-    const state = this._read();
-    state.scores = [];
-    this._write(state);
-  },
-
-  // ---------------------------------------------------------------- utils
-  formatTime(ms) {
-    const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    const pad = (n) => String(n).padStart(2, '0');
-    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    localStorage.removeItem(this._SCORES_KEY);
   },
 };
 
-// Esta linha é obrigatória: game.js e ui.js leem window.Progression.
 window.Progression = Progression;
