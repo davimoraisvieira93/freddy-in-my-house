@@ -19,22 +19,24 @@
       <div id="hud-night"><span id="hud-night-value">Noite 1</span></div>
     </div>
 
-    <!-- Controles do escritório -->
+    <!-- Controles do escritório.
+         Loop de 3 visões: 0 Centro (computador) → 1 Porta → 2 Janela → volta ao 0. -->
     <div id="office-controls" class="hidden">
       <button id="nav-left"  class="nav-btn nav-left"  data-action="turn" data-dir="-1" aria-label="Virar à esquerda">◀</button>
       <button id="nav-right" class="nav-btn nav-right" data-action="turn" data-dir="1"  aria-label="Virar à direita">▶</button>
 
-      <!-- só aparece olhando pro Centro (controlado por UI.syncControls) -->
+      <!-- só aparece na visão marcada com monitorButton em VIEWS (Porta) — controlado por UI.syncControls -->
       <button id="btn-open-monitor" class="monitor-btn hidden">📺 Câmeras</button>
 
-      <!-- só aparece olhando pra respectiva porta. O texto "PORTA ..." agora é desenhado no canvas -->
-      <div class="door-panel hidden" data-door="esquerda">
-        <button data-action="toggle-light" data-door="esquerda">💡 Luz</button>
-        <button data-action="toggle-door"  data-door="esquerda">🚪 Fechar</button>
+      <!-- cada painel só aparece na visão que controla a respectiva porta/janela.
+           O texto "PORTA"/"JANELA" é desenhado no canvas. -->
+      <div class="door-panel hidden" data-door="porta">
+        <button data-action="toggle-light" data-door="porta">💡 Luz</button>
+        <button data-action="toggle-door"  data-door="porta">🚪 Fechar</button>
       </div>
-      <div class="door-panel hidden" data-door="direita">
-        <button data-action="toggle-light" data-door="direita">💡 Luz</button>
-        <button data-action="toggle-door"  data-door="direita">🚪 Fechar</button>
+      <div class="door-panel hidden" data-door="janela">
+        <button data-action="toggle-light" data-door="janela">💡 Luz</button>
+        <button data-action="toggle-door"  data-door="janela">🪟 Fechar</button>
       </div>
     </div>
 
@@ -104,7 +106,10 @@
     </div>
   </div>
 
-  <!-- Ordem importa: config primeiro, main.js e menuExtras.js por último -->
+  <!-- Ordem importa: config primeiro, main.js e menuExtras.js por último.
+       admin.js pode vir em qualquer lugar depois de config.js, pois só
+       acessa window.game/window.* dentro dos handlers (tempo de execução,
+       não tempo de parse). -->
   <script src="js/config.js"></script>
   <script src="js/progression.js"></script>
   <script src="js/assetLoader.js"></script>
@@ -116,5 +121,6 @@
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
   <script src="js/menuExtras.js"></script>
+  <script src="js/admin.js"></script>
 </body>
 </html>
