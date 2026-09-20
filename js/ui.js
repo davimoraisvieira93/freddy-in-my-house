@@ -16,7 +16,8 @@
  * ativo) para ver o contorno da hitbox e calibrar.
  */
 (function injectBaseStyles() {
-  const css = `#btn-close-monitor { position: relative; z-index: 50; }`
+ const css = `
+    #btn-close-monitor { position: relative; z-index: 50; }
     #camera-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
     .cam-tab { background: #1a1a1a; color: #ccc; border: 1px solid #444;
       padding: 6px 10px; cursor: pointer; font: 12px monospace; }
