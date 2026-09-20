@@ -7,18 +7,20 @@
  * Dois nós são especiais e são resolvidos a cada FRAME (updateLocks), não a
  * cada tick de IA, porque dependem de o jogador reagir a tempo:
  *
- *  - 'porta:<id>'  -> o inimigo está encostado na porta. Se a porta continuar
- *    aberta por DOOR_ATTACK_GRACE_MS, ele ataca (retorna o id do inimigo,
- *    que o game.js usa pra disparar o jumpscare). Se a porta for fechada a
- *    tempo, ele bate (SFX 'knock') e desiste depois de DOOR_KNOCK_RETREAT_MS,
- *    voltando ao início da rota com um cooldown (ENEMY_RETREAT_COOLDOWN_MS)
- *    antes de tentar de novo.
+ *  - 'entrada:<doorId>' -> o inimigo está encostado na porta OU na janela
+ *    (ambas são "doors" em DOORS_CONFIG). Se a entrada continuar aberta por
+ *    DOOR_ATTACK_GRACE_MS, ele ataca (retorna o id do inimigo, que o game.js
+ *    usa pra disparar o jumpscare). Se for fechada a tempo, ele bate (SFX
+ *    'knock') e desiste depois de DOOR_KNOCK_RETREAT_MS, voltando ao início
+ *    da rota com um cooldown (ENEMY_RETREAT_COOLDOWN_MS) antes de tentar de novo.
  *
  *  - lockNode (só o Freddy usa, via ENEMIES_CONFIG) -> ele trava num cômodo
  *    específico. Enquanto a porta associada (lockNode.doorId) estiver aberta,
  *    o timer sobe; se chegar em lockNode.timeoutMs, ataca. Fechar a porta
  *    zera o timer (mecânica clássica do Freddy).
  */
+const ENTRY_PREFIX = 'entrada:';
+
 class Enemy {
   constructor(cfg) {
     this.id = cfg.id;
@@ -40,6 +42,16 @@ class EnemyManager {
     this.list = config.map((cfg) => new Enemy(cfg));
   }
 
+  /** 'porta' -> 'entrada:porta' */
+  static entryNode(doorId) { return ENTRY_PREFIX + doorId; }
+
+  /** 'entrada:janela' -> 'janela'; qualquer outro nó -> null */
+  static entryDoorId(node) {
+    return typeof node === 'string' && node.startsWith(ENTRY_PREFIX)
+      ? node.slice(ENTRY_PREFIX.length)
+      : null;
+  }
+
   reset() {
     this.list.forEach((e) => e.reset());
   }
@@ -47,10 +59,10 @@ class EnemyManager {
   /** Estado público de um inimigo (usado pela UI pra saber o que desenhar). */
   getPublicState(id) {
     const e = this.list.find((x) => x.id === id);
-    return e ? { node: e.node } : null;
+    return e ? { node: e.node, entryDoorId: EnemyManager.entryDoorId(e.node) } : null;
   }
 
-  /** Resolve, a cada frame, as mecânicas de porta e de trava. */
+  /** Resolve, a cada frame, as mecânicas de entrada (porta/janela) e de trava. */
   updateLocks(deltaMs, doors) {
     const c = window.GAME_CONSTANTS;
     for (const e of this.list) {
@@ -70,9 +82,9 @@ class EnemyManager {
         continue;
       }
 
-      if (typeof e.node === 'string' && e.node.startsWith('porta:')) {
-        const doorId = e.node.slice('porta:'.length);
-        const door = doors[doorId];
+      const entryDoorId = EnemyManager.entryDoorId(e.node);
+      if (entryDoorId !== null) {
+        const door = doors[entryDoorId];
 
         if (!e.doorTimer) {
           e.doorTimer = { elapsed: 0 };
@@ -104,7 +116,7 @@ class EnemyManager {
     for (const e of this.list) {
       if (e.cooldownMs > 0) continue;
       if (e.cfg.lockNode && e.node === e.cfg.lockNode.nodeId) continue;
-      if (typeof e.node === 'string' && e.node.startsWith('porta:')) continue;
+      if (EnemyManager.entryDoorId(e.node) !== null) continue;
 
       const level = nightAggression?.[e.id] ?? 0;
       if (level <= 0) continue;
