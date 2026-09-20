@@ -1,7 +1,13 @@
 const ASSETS = {
   images: {
+    // Um fundo por visão/estado. Cada arquivo é uma tela inteira (16:9, ex.: 1920×1080).
+    // Enquanto o arquivo não existir, o jogo desenha um placeholder com o nome da chave.
     office: {
-      background: 'assets/images/office/background.png', // panorama largo (180°)
+      centro:        'assets/images/office/centro.png',         // Visão 0 — computador
+      portaAberta:   'assets/images/office/porta_aberta.png',   // Visão 1 — porta aberta
+      portaFechada:  'assets/images/office/porta_fechada.png',  // Visão 1 — porta fechada
+      janelaAberta:  'assets/images/office/janela_aberta.png',  // Visão 2 — janela aberta
+      janelaFechada: 'assets/images/office/janela_fechada.png', // Visão 2 — janela fechada
     },
     cameras: {
       cam1: 'assets/images/cameras/cam1.png',
@@ -36,6 +42,7 @@ const ASSETS = {
         cam6: 'assets/images/enemies/chica_cam6.png',
         cam1: 'assets/images/enemies/chica_cam1.png',
         cam5: 'assets/images/enemies/chica_cam5.png',
+        naJanela: 'assets/images/enemies/chica_na_janela.png', // NOVO — Chica ataca pela janela
         jumpscare: 'assets/images/enemies/chica_jumpscare.png',
       },
     },
@@ -63,12 +70,29 @@ const ASSETS = {
 };
 
 // -----------------------------------------------------------------------
-// VIEWS — NOVO. game.js lê window.VIEWS[this.viewIndex] e ui.js lê
-// window.VIEWS.length; sem isso o "VIEWS is not defined" derruba o boot
-// inteiro. A ordem tem que bater com viewIndex=1 sendo o centro (é onde
-// startRun() sempre começa) e com os data-door="esquerda"/"direita" do HTML.
+// VIEWS — loop 360º com 3 visões fixas (índices 0, 1, 2).
+//   virar à direita: 0 → 1 → 2 → 0 …      virar à esquerda: 0 → 2 → 1 → 0 …
+//
+//   id             identificador (game.view devolve isto)
+//   doorId         qual porta de DOORS_CONFIG esta visão controla (null = nenhuma)
+//   monitorButton  true = o botão "📺 Câmeras" aparece nesta visão.
+//                  Pedido: só na Visão 1 (Porta). Para mudar, mova a flag.
+//   backgrounds    chaves de ASSETS.images.* (open/closed seguem o estado da porta)
 // -----------------------------------------------------------------------
-const VIEWS = ['esquerda', 'centro', 'direita'];
+const VIEWS = [
+  {
+    id: 'centro', label: 'Computador', doorId: null,
+    backgrounds: { default: 'office.centro' },
+  },
+  {
+    id: 'porta', label: 'Porta', doorId: 'porta', monitorButton: true,
+    backgrounds: { open: 'office.portaAberta', closed: 'office.portaFechada' },
+  },
+  {
+    id: 'janela', label: 'Janela', doorId: 'janela',
+    backgrounds: { open: 'office.janelaAberta', closed: 'office.janelaFechada' },
+  },
+];
 
 const ROOMS = [
   { id: 'cam1', label: 'Câm. 1' },
@@ -81,34 +105,36 @@ const ROOMS = [
   { id: 'cam8', label: 'Câm. 8' },
 ];
 
+// A janela usa a mesma mecânica da porta (fechar/abrir, luz, dreno de energia).
 const DOORS_CONFIG = [
-  { id: 'esquerda', label: 'Porta Esquerda' },
-  { id: 'direita', label: 'Porta Direita' },
+  { id: 'porta', label: 'Porta' },
+  { id: 'janela', label: 'Janela' },
 ];
 
 // -----------------------------------------------------------------------
-// DOOR_HITBOXES — NOVO. ui.js (renderOffice) lê window.DOOR_HITBOXES[door.id]
-// e espera { x, y, w, h } como FRAÇÕES (0–1): x/w são fração de
-// GAME_CONSTANTS.OFFICE_WORLD_WIDTH (o panorama de 1440px inteiro, não a
-// tela), y/h são fração de INTERNAL_HEIGHT (270px).
-//
-// Os valores abaixo são um ponto de partida funcional — cada porta cai
-// dentro do terço do mundo que corresponde à sua VIEW (esquerda: 0–480px,
-// direita: 960–1440px) — mas o alinhamento fino com o seu background.png
-// é visual: ajuste x/y/w/h olhando o jogo rodando até a hitbox (e o texto
-// da porta, desenhado por cima dela) encaixar no sprite.
+// DOOR_HITBOXES — agora em FRAÇÃO DA TELA (0–1), já que cada visão é uma
+// imagem fixa: x/w = fração da largura, y/h = fração da altura.
+// Servem para o rótulo "PORTA"/"JANELA", para o contorno de debug
+// (H com o Modo Admin) e para posicionar o inimigo placeholder.
 // -----------------------------------------------------------------------
 const DOOR_HITBOXES = {
-  esquerda: { x: 0.08, y: 0.30, w: 0.14, h: 0.55 },
-  direita:  { x: 0.78, y: 0.30, w: 0.14, h: 0.55 },
+  porta:  { x: 0.30, y: 0.12, w: 0.40, h: 0.80 },
+  janela: { x: 0.25, y: 0.18, w: 0.50, h: 0.55 },
 };
 
-// Cada inimigo agora usa um GRAFO de nós (não mais uma lista linear).
-// graph[nó] = lista de próximos nós possíveis (escolha aleatória entre eles).
-// Um nó 'porta:<id>' é uma porta de verdade (ataque clássico).
-// lockNode (só o Freddy usa) trava o inimigo num cômodo com uma mecânica
-// própria, resolvida por Enemy.updateLock() a cada frame (não por tick de IA).
+// -----------------------------------------------------------------------
+// ENEMIES_CONFIG — cada inimigo anda por um GRAFO de nós.
+//   graph[nó] = próximos nós possíveis (escolha aleatória).
+//   'entrada:<doorId>' = ponto de ataque (porta ou janela). Ali o inimigo bate
+//   e ataca se a entrada continuar aberta (ver enemyAI.js).
+//   lockNode (só o Freddy) = trava num cômodo com timer próprio.
+//
+// REGRA: todo nó precisa levar a uma 'entrada:*' (ou ser o lockNode).
+// Nó com lista vazia = beco sem saída = inimigo que nunca ataca.
+// main.js avisa no console se algum grafo violar isso.
+// -----------------------------------------------------------------------
 const ENEMIES_CONFIG = [
+  // FREDDY — cam8 → (cam3 | cam5) → cam2 (trava). Ataca se a PORTA ficar aberta 20s.
   {
     id: 'freddy',
     label: 'Freddy',
@@ -120,8 +146,11 @@ const ENEMIES_CONFIG = [
       cam2: [],
     },
     onMoveSfx: 'risada',
-    lockNode: { nodeId: 'cam2', timeoutMs: 20000, doorId: 'esquerda' },
+    lockNode: { nodeId: 'cam2', timeoutMs: 20000, doorId: 'porta' },
   },
+
+  // BONNIE — rota pela PORTA (Visão 1):
+  //   cam8 → cam3 → (cam2 | cam4 → cam2) → entrada:porta
   {
     id: 'bonnie',
     label: 'Bonnie',
@@ -129,10 +158,16 @@ const ENEMIES_CONFIG = [
     graph: {
       cam8: ['cam3'],
       cam3: ['cam2', 'cam4'],
-      cam2: ['porta:esquerda'],
-      cam4: [],
+      cam4: ['cam2'],            // antes era [] (beco sem saída)
+      cam2: ['entrada:porta'],
     },
   },
+
+  // CHICA — rota fixa pela JANELA (Visão 2):
+  //   cam8 → cam7 → cam6 → (cam1 | cam5) → entrada:janela
+  // Os dois ramos terminam na janela, então ela sempre chega lá; o que muda
+  // de uma noite para outra é a velocidade (agressão). Para mandá-la pela
+  // porta, troque 'entrada:janela' por 'entrada:porta' nas duas linhas abaixo.
   {
     id: 'chica',
     label: 'Chica',
@@ -141,18 +176,20 @@ const ENEMIES_CONFIG = [
       cam8: ['cam7'],
       cam7: ['cam6'],
       cam6: ['cam1', 'cam5'],
-      cam1: [],
-      cam5: [],
+      cam1: ['entrada:janela'],
+      cam5: ['entrada:janela'],
     },
   },
 ];
 
+// Bateria: o dreno base subiu (0.04 → 0.18/s) e o multiplicador cresce pouco
+// entre as noites, então o aperto é grande desde a Noite 1.
 const NIGHTS_CONFIG = [
   { label: 'Noite 1', aggression: { freddy: 1, bonnie: 1, chica: 1 }, powerDrainMultiplier: 1.0 },
-  { label: 'Noite 2', aggression: { freddy: 2, bonnie: 2, chica: 2 }, powerDrainMultiplier: 1.1 },
-  { label: 'Noite 3', aggression: { freddy: 3, bonnie: 4, chica: 3 }, powerDrainMultiplier: 1.2 },
-  { label: 'Noite 4', aggression: { freddy: 5, bonnie: 5, chica: 5 }, powerDrainMultiplier: 1.35 },
-  { label: 'Noite 5', aggression: { freddy: 6, bonnie: 7, chica: 7 }, powerDrainMultiplier: 1.5 },
+  { label: 'Noite 2', aggression: { freddy: 2, bonnie: 2, chica: 2 }, powerDrainMultiplier: 1.0 },
+  { label: 'Noite 3', aggression: { freddy: 3, bonnie: 4, chica: 3 }, powerDrainMultiplier: 1.05 },
+  { label: 'Noite 4', aggression: { freddy: 5, bonnie: 5, chica: 5 }, powerDrainMultiplier: 1.1 },
+  { label: 'Noite 5', aggression: { freddy: 6, bonnie: 7, chica: 7 }, powerDrainMultiplier: 1.15 },
 ];
 
 const GAME_CONSTANTS = {
@@ -165,8 +202,10 @@ const GAME_CONSTANTS = {
   AI_NOT_WATCHED_BONUS: 2,
   AI_NOT_WATCHED_THRESHOLD_MS: 15000,
 
+  // Bateria (% por segundo). Noite de 300s com multiplicador 1.0:
+  //   só o dreno base já come 0.18 × 300 = 54% da bateria.
   POWER_MAX: 100,
-  POWER_DRAIN_BASE_PER_SEC: 0.04,
+  POWER_DRAIN_BASE_PER_SEC: 0.18,              // era 0.04
   POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC: 0.10,
   POWER_DRAIN_PER_LIGHT_ON_PER_SEC: 0.12,
   POWER_DRAIN_MONITOR_OPEN_PER_SEC: 0.16,
@@ -176,28 +215,19 @@ const GAME_CONSTANTS = {
   DOOR_KNOCK_RETREAT_MS: 3000,
   ENEMY_RETREAT_COOLDOWN_MS: 8000,
 
-  // Motor visual (tela cheia, pan 180°, estética VHS)
+  // Motor visual
   INTERNAL_WIDTH: 480,
   INTERNAL_HEIGHT: 270,
-  OFFICE_WORLD_WIDTH: 1440, // panorama 3x mais largo que a tela = visão de 180°
-  MONITOR_CENTER_MARGIN: 160, // faixa central (em px do mundo) onde dá pra abrir o monitor
-  MOUSE_PAN_SMOOTHING: 0.12,
-  JITTER_MAX_PX: 1.5,
-  STATIC_NOISE_DENSITY: 45,
+  VIEW_TRANSITION_MS: 220,   // duração do giro entre visões (0 = corte seco)
+  JITTER_MAX_PX: 1.5,        // tremida do feed das câmeras
+  STATIC_NOISE_DENSITY: 45,  // pontinhos de ruído no escritório
 
-  // NOVO — game.js faz cameraOffsetX += (target - offset) * VIEW_SMOOTHING
-  // a cada frame. Sem essa chave o resultado é NaN e o escritório some da
-  // tela ao virar (mas o boot em si não trava, por isso passava despercebido).
-  VIEW_SMOOTHING: 0.15,
-
-  // NOVO — game.js._currentNight() usa estas 4 chaves só quando mode==='infinite'
-  // (botão "Modo Infinito", liberado após terminar a Noite 5). Sem elas, o
-  // nível vira NaN assim que alguém entra nesse modo. Ajuste a progressão
-  // como quiser; estes são valores de partida razoáveis.
+  // Modo Infinito. O multiplicador caiu de 1.6 para 0.6: com o dreno base novo,
+  // 1.6 esgotaria a bateria em ~5 min mesmo sem usar nada.
   INFINITE_START_LEVEL: 1,
   INFINITE_MAX_LEVEL: 10,
-  INFINITE_RAMP_MS: 60 * 1000,   // sobe 1 nível de agressão a cada 60s
-  INFINITE_POWER_MULT: 1.6,
+  INFINITE_RAMP_MS: 60 * 1000,
+  INFINITE_POWER_MULT: 0.6,
 };
 
 window.ASSETS = ASSETS;
