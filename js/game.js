@@ -24,22 +24,24 @@ class Game {
     this.elapsedNightMs = 0;
     this.aiTickAccumulator = 0;
     this.lastFrameTime = 0;
+    this._raf = null;
 
     // Modo Admin (js/admin.js) liga isto via window.game.godMode = true;
     // enquanto ativo, jumpscares são ignorados (o inimigo só reseta).
     this.godMode = false;
 
-    this.viewIndex = 1;
-    this.cameraOffsetX = this._viewOffset(1);
-    this.targetOffsetX = this._viewOffset(1);
+    // Loop 360º de visões fixas (ver VIEWS em config.js):
+    // 0 = Centro (computador), 1 = Porta, 2 = Janela.
+    this.viewIndex = 0;
+    this.slide = null; // { from, to, dir, t } enquanto o giro está animando
 
     UI.buildCameraTabs(window.ROOMS, (roomId) => this.switchCameraRoom(roomId));
     this._resizeCanvas();
     this._setupInputs();
   }
 
-  get view() { return window.VIEWS[this.viewIndex]; }
-  _viewOffset(i) { return i * this.constants.INTERNAL_WIDTH; }
+  get viewDef() { return window.VIEWS[this.viewIndex]; }
+  get view() { return this.viewDef.id; }
 
   _resizeCanvas() {
     this.canvas.width = window.innerWidth;
@@ -56,12 +58,23 @@ class Game {
     });
   }
 
+  /** Liga/desliga o filtro CSS do monitor (classe .cam-feed, definida em ui.js). */
+  _setCameraFeed(on) {
+    this.canvas.classList.toggle('cam-feed', !!on);
+  }
+
+  /** dir > 0 = virar à direita, dir < 0 = virar à esquerda. Dá a volta (0→1→2→0). */
   turn(dir) {
-    if (this.state !== 'playing' || this.cameras.isOpen || this.power.isBlackedOut) return;
-    const next = Math.min(window.VIEWS.length - 1, Math.max(0, this.viewIndex + dir));
-    if (next === this.viewIndex) return;
-    this.viewIndex = next;
-    this.targetOffsetX = this._viewOffset(next);
+    if (this.state !== 'playing' || this.cameras.isOpen || this.power.isBlackedOut || this.slide) return;
+    const n = window.VIEWS.length;
+    const step = dir > 0 ? 1 : -1;
+    const from = this.viewIndex;
+    const to = (from + step + n) % n;
+
+    this.viewIndex = to;
+    if (this.constants.VIEW_TRANSITION_MS > 0) {
+      this.slide = { from, to, dir: step, t: 0 };
+    }
     UI.syncControls(this);
   }
 
@@ -78,8 +91,9 @@ class Game {
     this.cameras.reset();
     this.enemies.reset();
 
-    this.viewIndex = 1;
-    this.cameraOffsetX = this.targetOffsetX = this._viewOffset(1);
+    this.viewIndex = 0;
+    this.slide = null;
+    this._setCameraFeed(false);
 
     this.state = 'playing';
     this.lastFrameTime = performance.now();
@@ -93,7 +107,11 @@ class Game {
     UI.syncControls(this);
 
     this.assetLoader.playSfx('ambience', { loop: true, volume: 0.5 });
-    requestAnimationFrame((t) => this.loop(t));
+
+    // Sempre um único loop: pular de noite pelo Admin com o jogo rodando
+    // antes criava um segundo requestAnimationFrame (tudo em dobro).
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = requestAnimationFrame((t) => this.loop(t));
   }
 
   startNight(nightIndex) { this.startRun({ mode: 'story', nightIndex }); }
@@ -115,11 +133,14 @@ class Game {
     return window.NIGHTS_CONFIG[this.nightIndex];
   }
 
+  /** Só dá pra mexer na porta/janela da visão em que o jogador está olhando. */
   _canActOnDoor(doorId) {
-    return this.state === 'playing'
+    return !!doorId
+      && this.state === 'playing'
       && !this.power.isBlackedOut
       && !this.cameras.isOpen
-      && this.view === doorId;
+      && this.viewDef.doorId === doorId
+      && !!this.doors[doorId];
   }
 
   toggleDoor(doorId) {
@@ -138,12 +159,20 @@ class Game {
 
   toggleMonitor() {
     if (this.state !== 'playing' || this.power.isBlackedOut) return;
-    if (!this.cameras.isOpen && this.view !== 'centro') return;
+    // Abrir só na visão marcada com monitorButton (Porta). Fechar vale em qualquer caso.
+    if (!this.cameras.isOpen && !this.viewDef.monitorButton) return;
 
-    const isOpen = this.cameras.toggle(true);
+    // BUG CORRIGIDO: antes era `this.cameras.toggle(true)`, que SEMPRE abre —
+    // por isso o "✕ Fechar Monitor" (e o Espaço) nunca fechavam nada.
+    const isOpen = this.cameras.toggle();
+
+    this.slide = null;
     document.getElementById('camera-monitor').classList.toggle('hidden', !isOpen);
     document.getElementById('office-controls').classList.toggle('hidden', isOpen);
+    this._setCameraFeed(isOpen);
+
     if (isOpen) {
+      UI.triggerCameraFlash();
       this.assetLoader.playSfx('cameraStatic', { volume: 0.4 });
       UI.setActiveCameraTab(this.cameras.currentRoomId);
     }
@@ -153,6 +182,7 @@ class Game {
   switchCameraRoom(roomId) {
     if (this.state !== 'playing' || !this.cameras.isOpen) return;
     this.cameras.switchRoom(roomId);
+    UI.triggerCameraFlash();
     this.assetLoader.playSfx('cameraStatic', { volume: 0.25 });
     UI.setActiveCameraTab(roomId);
   }
@@ -160,20 +190,23 @@ class Game {
   _onBlackout() {
     Object.values(this.doors).forEach((d) => { d.isClosed = false; d.lightOn = false; });
     this.cameras.close();
+    this._setCameraFeed(false);
     document.getElementById('camera-monitor').classList.add('hidden');
     document.getElementById('office-controls').classList.add('hidden');
     this.assetLoader.playSfx('blackout');
     UI.syncControls(this);
   }
 
+  /** Retorna true se o jumpscare realmente aconteceu (false no god mode). */
   _triggerJumpscare(enemyId) {
     // Modo Admin: god mode ignora o ataque e só reseta os inimigos.
     if (this.godMode) {
       this.enemies.reset();
-      return;
+      return false;
     }
 
     this.state = 'jumpscare';
+    this._setCameraFeed(false);
     const overlays = UI.renderJumpscare(this.bufferCtx, this.buffer, this.assetLoader, enemyId);
     this._blitBuffer();
     UI.setEnemyOverlays(overlays);
@@ -188,6 +221,7 @@ class Game {
       result = { ms, rank: window.Progression.addScore(ms) };
     }
     setTimeout(() => this._onGameOver(result), 2200);
+    return true;
   }
 
   _onGameOver(result) {
@@ -210,6 +244,7 @@ class Game {
 
   _onVictory() {
     this.state = 'victory';
+    this._setCameraFeed(false);
     UI.setEnemyOverlays([]);
     this.assetLoader.playSfx('victory');
 
@@ -245,16 +280,20 @@ class Game {
   loop(now) {
     if (this.state !== 'playing') return;
 
-    const deltaMs = Math.min(now - this.lastFrameTime, 200);
+    const deltaMs = Math.max(0, Math.min(now - this.lastFrameTime, 200));
     this.lastFrameTime = now;
     this.elapsedNightMs += deltaMs;
 
-    this.cameraOffsetX += (this.targetOffsetX - this.cameraOffsetX) * this.constants.VIEW_SMOOTHING;
+    // Animação do giro entre visões.
+    if (this.slide) {
+      this.slide.t += deltaMs / this.constants.VIEW_TRANSITION_MS;
+      if (this.slide.t >= 1) this.slide = null;
+    }
 
     const night = this._currentNight();
 
-    const lockedJumpscare = this.enemies.updateLocks(deltaMs, this.doors, this.cameras);
-    if (lockedJumpscare) { this._triggerJumpscare(lockedJumpscare); return; }
+    const lockedJumpscare = this.enemies.updateLocks(deltaMs, this.doors);
+    if (lockedJumpscare && this._triggerJumpscare(lockedJumpscare)) return;
 
     this.power.tick(deltaMs / 1000, Object.values(this.doors), this.cameras.isOpen, night.powerDrainMultiplier);
 
@@ -269,7 +308,7 @@ class Game {
         tickIntervalMs: this.constants.AI_TICK_INTERVAL_MS,
         assetLoader: this.assetLoader,
       });
-      if (jumpscaredBy) { this._triggerJumpscare(jumpscaredBy); return; }
+      if (jumpscaredBy && this._triggerJumpscare(jumpscaredBy)) return;
     }
 
     if (this.mode !== 'infinite' && this.elapsedNightMs >= this.constants.NIGHT_DURATION_MS) {
@@ -280,7 +319,10 @@ class Game {
     const overlays = this.cameras.isOpen
       ? UI.renderCameraMonitor(this.bufferCtx, this.buffer, this.assetLoader, this)
       : UI.renderOffice(this.bufferCtx, this.buffer, this.assetLoader, this);
-    UI.drawStaticNoise(this.bufferCtx, this.buffer.width, this.buffer.height, this.constants.STATIC_NOISE_DENSITY);
+    // O monitor já desenha o próprio ruído (mais forte); o escritório usa o leve.
+    if (!this.cameras.isOpen) {
+      UI.drawStaticNoise(this.bufferCtx, this.buffer.width, this.buffer.height, this.constants.STATIC_NOISE_DENSITY);
+    }
     this._blitBuffer();
     UI.setEnemyOverlays(overlays);
 
@@ -295,7 +337,7 @@ class Game {
       nightLabel: night.label,
     });
 
-    requestAnimationFrame((t) => this.loop(t));
+    this._raf = requestAnimationFrame((t) => this.loop(t));
   }
 
   _formatClock(hourFloat) {
