@@ -2,7 +2,7 @@ const ASSETS = {
   images: {
     // Um fundo por visão/estado. Cada arquivo é uma tela inteira (16:9, ex.: 1920×1080).
     // Enquanto o arquivo não existir, o jogo desenha um placeholder com o nome da chave.
-    office: {
+    office: 
       centro:        'assets/images/office/centro.png',         // Visão 0 — computador
       portaAberta:   'assets/images/office/porta_aberta.png',   // Visão 1 — porta aberta
       portaFechada:  'assets/images/office/porta_fechada.png',  // Visão 1 — porta fechada
@@ -81,11 +81,11 @@ const ASSETS = {
 // -----------------------------------------------------------------------
 const VIEWS = [
   {
-    id: 'centro', label: 'Computador', doorId: null,
+    id: 'centro', label: 'Computador', doorId: null, monitorButton: true, // A FLAG VEIO PRA CÁ!
     backgrounds: { default: 'office.centro' },
   },
   {
-    id: 'porta', label: 'Porta', doorId: 'porta', monitorButton: true,
+    id: 'porta', label: 'Porta', doorId: 'porta', // E SUMIU DAQUI!
     backgrounds: { open: 'office.portaAberta', closed: 'office.portaFechada' },
   },
   {
@@ -93,7 +93,6 @@ const VIEWS = [
     backgrounds: { open: 'office.janelaAberta', closed: 'office.janelaFechada' },
   },
 ];
-
 const ROOMS = [
   { id: 'cam1', label: 'Câm. 1' },
   { id: 'cam2', label: 'Câm. 2' },
