@@ -81,11 +81,11 @@ const ASSETS = {
 // -----------------------------------------------------------------------
 const VIEWS = [
   {
-    id: 'centro', label: 'Computador', doorId: null, monitorButton: true, // A FLAG VEIO PRA CÁ!
+    id: 'centro', label: 'Computador', doorId: null, monitorButton: true,
     backgrounds: { default: 'office.centro' },
   },
   {
-    id: 'porta', label: 'Porta', doorId: 'porta', // E SUMIU DAQUI!
+    id: 'porta', label: 'Porta', doorId: 'porta',
     backgrounds: { open: 'office.portaAberta', closed: 'office.portaFechada' },
   },
   {
