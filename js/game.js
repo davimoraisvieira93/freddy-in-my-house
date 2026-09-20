@@ -25,6 +25,10 @@ class Game {
     this.aiTickAccumulator = 0;
     this.lastFrameTime = 0;
 
+    // Modo Admin (js/admin.js) liga isto via window.game.godMode = true;
+    // enquanto ativo, jumpscares são ignorados (o inimigo só reseta).
+    this.godMode = false;
+
     this.viewIndex = 1;
     this.cameraOffsetX = this._viewOffset(1);
     this.targetOffsetX = this._viewOffset(1);
@@ -163,6 +167,12 @@ class Game {
   }
 
   _triggerJumpscare(enemyId) {
+    // Modo Admin: god mode ignora o ataque e só reseta os inimigos.
+    if (this.godMode) {
+      this.enemies.reset();
+      return;
+    }
+
     this.state = 'jumpscare';
     const overlays = UI.renderJumpscare(this.bufferCtx, this.buffer, this.assetLoader, enemyId);
     this._blitBuffer();
