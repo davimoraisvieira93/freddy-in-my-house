@@ -2,7 +2,7 @@ const ASSETS = {
   images: {
     // Um fundo por visão/estado. Cada arquivo é uma tela inteira (16:9, ex.: 1920×1080).
     // Enquanto o arquivo não existir, o jogo desenha um placeholder com o nome da chave.
-    office: 
+    office: {
       centro:        'assets/images/office/centro.png',         // Visão 0 — computador
       portaAberta:   'assets/images/office/porta_aberta.png',   // Visão 1 — porta aberta
       portaFechada:  'assets/images/office/porta_fechada.png',  // Visão 1 — porta fechada
