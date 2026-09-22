@@ -1,115 +1,122 @@
-# Vigia Noturna — Fangame modular (HTML5 + Canvas + JS puro)
+# Guia de sprites — Freddy in My House
 
-Fangame de sobrevivência ponto-e-clique inspirado nas mecânicas do gênero
-popularizado por *Five Nights at Freddy's* (portas, câmeras, gestão de
-energia e IA por níveis de agressividade). O código é **inteiramente
-original** — nenhuma linha, sprite ou som vem do jogo comercial — e foi
-desenhado desde o início para você substituir os personagens genéricos
-por fotos da sua própria casa, família e pets.
+> **Aviso:** o `ASSETS-GUIDE.md` que já existe no repositório está
+> desatualizado (fala de um panorama único `office/background.png`).
+> A versão atual do `js/config.js` (v3, "visões fixas") usa **5 imagens
+> separadas** para o escritório em vez de um panorama. Este guia
+> substitui aquele.
 
-Sem build step, sem framework, sem `npm install`. É só HTML/CSS/JS puro,
-então roda abrindo o `index.html` direto no navegador ou publicando a
-pasta inteira no GitHub Pages.
+Regra de ouro: **o nome e o caminho do arquivo importam, o conteúdo
+não.** Coloque o arquivo com o nome exato indicado abaixo (com a
+extensão certa!) e o jogo passa a usá-lo automaticamente — não precisa
+mexer em código nenhum. Enquanto um arquivo não existir (ou tiver nome
+errado), o jogo desenha um placeholder cinza com o nome da chave no
+lugar, tipo `office.centro`.
 
-## Como rodar localmente
+⚠️ **Extensão é obrigatória.** No GitHub, ao subir o arquivo, confirme
+que o nome final tem `.png` (ou `.mp3` para áudio). Um arquivo chamado
+só `centro` (sem `.png`) gera 404 e cai no placeholder — já vimos isso
+acontecer neste projeto.
 
-Abra `index.html` no navegador. Pronto. (Alguns navegadores restringem
-`fetch`/módulos ES em arquivos abertos via `file://`, por isso o projeto
-usa `<script>` normais, sem `import`/`export` — funciona sem servidor.)
+Todo o mapa de caminhos fica em **`js/config.js`**, dentro do objeto
+`ASSETS`. Se quiser usar outro nome de arquivo, é só editar o caminho
+lá — o resto do código não precisa mudar.
 
-## Como publicar no GitHub Pages
+---
 
-1. Suba esta pasta para um repositório no GitHub.
-2. Nas configurações do repositório, vá em **Settings → Pages**.
-3. Em "Branch", selecione `main` (ou a branch que você usa) e a pasta `/root`.
-4. Salve — em alguns minutos o jogo estará em `https://<seu-usuario>.github.io/<repo>/`.
+## 1. Escritório (as 3 visões fixas)
 
-## Estrutura dos arquivos
+Cada visão é uma **imagem de tela cheia** (recomendado 16:9, ex.
+1920×1080 ou qualquer proporção parecida — o jogo corta/cobre
+automaticamente com `drawCover`).
 
-```
-index.html          Estrutura da página (canvas, HUD, telas)
-css/style.css        Todo o visual (tema, HUD, painéis, telas)
-js/config.js          <<< MAPA CENTRAL DE ASSETS E BALANCEAMENTO >>>
-js/assetLoader.js     Carrega imagens/sons com fallback de placeholder
-js/doors.js            Classe Door: estado aberto/fechado + luz
-js/power.js             Sistema de energia (consumo e apagão)
-js/cameras.js            Sistema de monitor de câmeras
-js/enemyAI.js             IA dos inimigos (movimento por ticks/agressividade)
-js/ui.js                   Todo o desenho no canvas + atualização do HUD
-js/game.js                   Loop principal, liga todos os sistemas
-js/main.js                    Bootstrap + liga os botões da tela ao jogo
-assets/images/...              Onde entram SEUS sprites (ver ASSETS-GUIDE.md)
-assets/audio/...                Onde entram SEUS sons (ver ASSETS-GUIDE.md)
-```
+| Visão | Estado | Caminho esperado |
+|---|---|---|
+| Computador (visão 0) | única | `assets/images/office/centro.png` |
+| Porta (visão 1) | porta aberta | `assets/images/office/porta_aberta.png` |
+| Porta (visão 1) | porta fechada | `assets/images/office/porta_fechada.png` |
+| Janela (visão 2) | janela aberta | `assets/images/office/janela_aberta.png` |
+| Janela (visão 2) | janela fechada | `assets/images/office/janela_fechada.png` |
 
-Para o passo a passo de como substituir cada imagem/som, veja
-**`ASSETS-GUIDE.md`**.
+Essas 5 imagens são tudo que você precisa pro cenário do escritório.
+Não existe mais um "panorama único" — cada visão/estado é um arquivo
+próprio.
 
-## Como cada lógica foi implementada
+## 2. Câmeras (monitor)
 
-### Energia (`power.js`)
+| Onde entra | Caminho esperado |
+|---|---|
+| Câmeras 1 a 8 | `assets/images/cameras/cam1.png` … `cam8.png` |
+| Estática ao trocar de câmera | `assets/images/cameras/static.png` |
 
-A energia é um número de 0 a 100. A cada frame, `PowerSystem.tick()`
-soma o consumo por segundo de cada fonte ativa:
+## 3. Inimigos (Freddy, Bonnie, Chica)
 
-- uma taxa-base fixa (a casa sempre gasta um pouco, mesmo com tudo
-  desligado);
-- `+` uma taxa por **porta fechada** (`Door.getPowerDrainPerSec`);
-- `+` uma taxa por **luz de checagem acesa**;
-- `+` uma taxa extra se o **monitor de câmeras** estiver aberto.
+Todos ficam em `assets/images/enemies/`. Cada inimigo precisa de um
+sprite por **nó** do caminho dele (`graph`, em `ENEMIES_CONFIG`), mais
+um de jumpscare. Se um nó não tiver imagem, aparece um placeholder
+vermelho com o nome do personagem.
 
-Essa soma é multiplicada pelo `powerDrainMultiplier` da noite atual
-(`NIGHTS_CONFIG`, em `config.js`), o que faz a dificuldade escalar noite
-após noite sem precisar duplicar nenhuma lógica. Ao chegar a 0, o
-`onBlackout` callback é disparado uma única vez: todas as portas
-destrancam/abrem sozinhas, o monitor para de funcionar, e a cena fica
-escurecida (`ui.js`) — a partir daí, qualquer inimigo que chegue a uma
-porta vai direto para o cronômetro de ataque, sem defesa possível.
+**Freddy** (rota: cam8 → cam3/cam5 → cam2, depois trava e ataca a porta):
+- `freddy_cam8.png`, `freddy_cam3.png`, `freddy_cam5.png`, `freddy_cam2.png`
+- `freddy_jumpscare.png`
 
-### Portas e janelas (`doors.js`)
+**Bonnie** (rota: cam8 → cam3 → cam2/cam4 → entra pela porta):
+- `bonnie_cam8.png`, `bonnie_cam3.png`, `bonnie_cam2.png`, `bonnie_cam4.png`
+- `bonnie_na_porta.png` — aparece quando ela está parada **na porta**, com a porta aberta
+- `bonnie_jumpscare.png`
 
-Cada porta é uma pequena máquina de estados independente com três
-campos: `isClosed`, `lightOn` e `occupiedBy` (id do inimigo parado ali,
-ou `null`). A porta **não decide** se o jumpscare acontece — ela só
-expõe esse estado. Quem lê o estado e decide "atacar ou não" é sempre o
-`enemyAI.js`, então toda a regra de "o que é seguro" fica concentrada
-num único lugar.
+**Chica** (rota: cam8 → cam7 → cam6 → cam1/cam5 → entra pela janela):
+- `chica_cam8.png`, `chica_cam7.png`, `chica_cam6.png`, `chica_cam1.png`, `chica_cam5.png`
+- `chica_na_janela.png` — aparece quando ela está parada **na janela**, com a janela aberta (imagem nova desta versão; o guia antigo não tinha isso)
+- `chica_jumpscare.png`
 
-### IA dos inimigos (`enemyAI.js`)
+> Se você mudar a rota de um personagem no `graph` (config.js), lembre
+> de ter um sprite pra cada nó novo, senão vira placeholder.
 
-Cada inimigo tem um **caminho** fixo de cômodos (`path`, em
-`ENEMIES_CONFIG`) terminando sempre em `porta:<id>`. A cada
-`AI_TICK_INTERVAL_MS` (5s por padrão), cada inimigo "rola um dado" de 0
-a 19: se o resultado for menor que a `aggression` da noite atual, ele
-avança um passo no caminho. É o clássico esquema de "nível de IA" do
-gênero — agressividade 0 é praticamente parado; perto de 19 ele avança
-quase a cada tick. Se o cômodo onde ele está não é visto pela câmera há
-muito tempo (`AI_NOT_WATCHED_THRESHOLD_MS`), ganha um bônus de chance —
-isso incentiva o jogador a girar entre as câmeras, e não travar numa só.
+## 4. Ícones da UI (opcional)
 
-Ao chegar na porta-alvo:
-- se a porta está **fechada**: ele "bate" por um tempo
-  (`DOOR_KNOCK_RETREAT_MS`) e depois recua, reiniciando o caminho do
-  zero após um cooldown;
-- se a porta está **aberta**: um cronômetro de ataque
-  (`DOOR_ATTACK_GRACE_MS`) começa a contar. Se o jogador não fechar a
-  porta a tempo, `enemyAI.js` retorna `true` para `game.js`, que
-  dispara o jumpscare em tela cheia.
+| Onde entra | Caminho esperado |
+|---|---|
+| Ícone de energia | `assets/images/ui/icon_power.png` |
+| Ícone de câmera | `assets/images/ui/icon_camera.png` |
+| Ícone de porta | `assets/images/ui/icon_door.png` |
+| Ícone de luz | `assets/images/ui/icon_light.png` |
 
-### Câmeras (`cameras.js` + `ui.js`)
+## 5. Sons
 
-O monitor guarda apenas: se está aberto, qual cômodo está sendo exibido,
-e um timestamp de "última vez visto" por cômodo (usado pela IA, acima).
-`ui.js` desenha a imagem de fundo daquele cômodo e, por cima, o sprite
-de qualquer inimigo que esteja passando por ali naquele momento
-(`EnemyManager.getVisibleInRoom`).
+| Onde entra | Caminho esperado |
+|---|---|
+| Ambiente (loop) | `assets/audio/ambience/ambience_loop.mp3` |
+| Abrir/fechar porta ou janela | `assets/audio/sfx/door_toggle.mp3` |
+| Ligar/desligar luz | `assets/audio/sfx/light_toggle.mp3` |
+| Estática da câmera | `assets/audio/sfx/camera_static.mp3` |
+| Energia baixa | `assets/audio/sfx/power_low.mp3` |
+| Apagão | `assets/audio/sfx/blackout.mp3` |
+| Batida na porta/janela | `assets/audio/sfx/knock.mp3` |
+| Jumpscare | `assets/audio/sfx/jumpscare.mp3` |
+| Vitória (6 AM) | `assets/audio/sfx/victory_6am.mp3` |
+| Risada do Freddy (ao avançar de nó) | `assets/audio/sfx/risada.mp3` |
+| Beatbox do menu | `assets/audio/sfx/beatbox.mp3` |
 
-## Aviso sobre o repositório indicado como referência
+## 6. Trocando o nome dos personagens
 
-Ao pesquisar o repositório apontado como referência técnica, percebi que
-ele é uma decompilação/recompilação direta do jogo comercial original
-(o próprio README dele diz isso), não um fangame com código próprio.
-Por isso não usei nada de lá — nem estrutura, nem trechos de código:
-toda a arquitetura acima foi escrita do zero, usando apenas mecânicas
-genéricas do gênero (que não são protegidas por direito autoral), para
-manter este projeto seguro para você publicar como portfólio.
+`freddy`, `bonnie` e `chica` em `ENEMIES_CONFIG` (config.js) são só
+identificadores internos — o `label` é o que aparece no jogo. Pra
+trocar por uma pessoa da família ou um pet:
+
+1. Troque o `label` no config (ex.: `label: 'Vovô'`).
+2. Renomeie os arquivos de imagem/som correspondentes, mantendo o
+   mesmo padrão (`<id>_cam8.png`, `<id>_jumpscare.png` etc.) — ou
+   simplesmente troque os caminhos dentro do próprio objeto do
+   inimigo em `config.js` se preferir manter os nomes de arquivo
+   como estão.
+3. As rotas (`graph`) e a mecânica especial de trava (`lockNode`, só
+   no Freddy) continuam funcionando do mesmo jeito, independente do
+   nome escolhido.
+
+## 7. Checklist rápido antes de subir uma imagem nova
+
+- [ ] Nome do arquivo bate **exatamente** com o caminho em `config.js` (maiúsculas/minúsculas importam)
+- [ ] Extensão `.png` (ou `.mp3`) está no nome do arquivo, não só no caminho do código
+- [ ] Proporção ~16:9 para fundos de escritório/câmera (evita distorção com `drawCover`)
+- [ ] Testou com Ctrl+Shift+R (hard refresh) pra não pegar cache de um 404 antigo
