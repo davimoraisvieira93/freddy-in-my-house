@@ -185,17 +185,58 @@ const UI = (() => {
     });
   }
 
-  /** Troca o <img> de dentro do botão (cria o <img> na primeira vez). */
+  /** Troca o <img> de dentro do botão (cria o <img> na primeira vez).
+   *  Guarda o texto/emoji original em data-fallback-text; se o PNG ainda não
+   *  existir (404), volta pro texto sozinho em vez de deixar o ícone quebrado. */
   function setButtonImage(btn, src) {
     if (!btn || !src) return;
     let img = btn.querySelector('img.btn-icon');
     if (!img) {
+      if (btn.dataset.fallbackText === undefined) btn.dataset.fallbackText = btn.textContent;
       btn.textContent = '';
       img = document.createElement('img');
       img.className = 'btn-icon';
+      img.onerror = () => {
+        img.remove();
+        btn.textContent = btn.dataset.fallbackText || '';
+      };
       btn.appendChild(img);
     }
     if (img.getAttribute('src') !== src) img.src = src;
+  }
+
+  /** Botões de abrir/fechar o monitor de câmeras (são dois botões separados
+   *  no HTML — um dentro de #office-controls, outro dentro de #camera-monitor). */
+  function applyMonitorButtonIcons() {
+    const ui = (window.ASSETS && window.ASSETS.images && window.ASSETS.images.ui) || {};
+    setButtonImage(document.getElementById('btn-open-monitor'), ui.buttonCameraOpen);
+    setButtonImage(document.getElementById('btn-close-monitor'), ui.buttonCameraClose);
+  }
+
+  /** Botões PNG da tela de início. Chame de novo sempre que o menu reaparecer
+   *  (refreshMenu, em menuExtras.js já faz isso) — é seguro chamar várias vezes. */
+  function applyMenuButtonIcons() {
+    const menu = (window.ASSETS && window.ASSETS.images && window.ASSETS.images.menu) || {};
+    setButtonImage(document.getElementById('btn-start'), menu.buttonStart);
+    setButtonImage(document.getElementById('btn-custom'), menu.buttonCustom);
+    setButtonImage(document.getElementById('btn-infinite'), menu.buttonInfinite);
+    setButtonImage(document.getElementById('btn-leaderboard'), menu.buttonLeaderboard);
+    // Extras: só faz algo se existir um <button id="btn-extras"> no HTML.
+    setButtonImage(document.getElementById('btn-extras'), menu.buttonExtras);
+  }
+
+  /** Fundo da tela de início (a imagem que você mandou, sem nenhum botão
+   *  desenhado nela — os botões continuam sendo elementos separados por
+   *  cima, aplicados em applyMenuButtonIcons). Só põe o background-image
+   *  inline, então funciona sem precisar mexer no seu CSS. */
+  function applyMenuBackground() {
+    const menu = (window.ASSETS && window.ASSETS.images && window.ASSETS.images.menu) || {};
+    const el = document.getElementById('menu-screen');
+    if (!el || !menu.background) return;
+    el.style.backgroundImage = `url("${menu.background}")`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.backgroundRepeat = 'no-repeat';
   }
 
   function setDoorButtonsState(doors) {
@@ -211,7 +252,6 @@ const UI = (() => {
       }
       if (lightBtn) {
         setButtonImage(lightBtn, door.lightOn ? btnImgs.buttonLuzLigada : btnImgs.buttonLuzApagada);
-        lightBtn.disabled = door.isClosed;
         lightBtn.classList.toggle('active', door.lightOn);
       }
     });
@@ -235,6 +275,16 @@ const UI = (() => {
       img.src = o.src;
       layer.appendChild(img);
     });
+  }
+
+  /** Tremida da camada de sprites (#enemy-layer), em pixels de tela.
+   *  Chamada com o MESMO deslocamento usado no fundo da câmera (jx/jy em
+   *  renderCameraMonitor, já escalado), pra o animatronic tremer junto com
+   *  a imagem em vez de ficar "flutuando" parado por cima. */
+  function setEnemyLayerShake(dx, dy) {
+    const layer = document.getElementById('enemy-layer');
+    if (!layer) return;
+    layer.style.transform = (dx || dy) ? `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)` : '';
   }
 
   // ---------------------------------------------------------- escritório
@@ -325,6 +375,7 @@ const UI = (() => {
     const W = buffer.width;
     const H = buffer.height;
     const overlays = [];
+    setEnemyLayerShake(0, 0);
 
     if (game.slide) {
       // giro entre visões: a antiga sai e a nova entra pelo lado oposto
@@ -355,6 +406,7 @@ const UI = (() => {
 
     // troca de câmera / abertura do monitor: um instante de chiado
     if (performance.now() < flashUntil) {
+      setEnemyLayerShake(0, 0);
       const st = assetLoader.getImage('cameras.static');
       if (st) drawCover(ctx, st, 0, 0, W, H);
       drawStaticNoise(ctx, W, H, (c.STATIC_NOISE_DENSITY || 45) * 8);
@@ -370,6 +422,12 @@ const UI = (() => {
     if (bg) drawCover(ctx, bg, jx - j, jy - j, W + 2 * j, H + 2 * j);
     else drawPlaceholder(ctx, 0, 0, W, H, key, '#1f2937');
 
+    // O sprite do animatronic (camada DOM #enemy-layer) treme junto com o
+    // fundo: mesma direção do jitter acima, só escalada pro tamanho real da
+    // tela (o buffer é interno, INTERNAL_WIDTH x INTERNAL_HEIGHT).
+    const shakeScale = game.canvas ? game.canvas.width / buffer.width : 1;
+    setEnemyLayerShake(jx * shakeScale, jy * shakeScale);
+
     (window.ENEMIES_CONFIG || []).forEach((cfg) => {
       const st = game.enemies.getPublicState(cfg.id);
       if (!st || st.node !== roomId) return;
@@ -378,10 +436,8 @@ const UI = (() => {
       else drawPlaceholder(ctx, W * 0.3, H * 0.25, W * 0.4, H * 0.6, cfg.label, 'rgba(127,29,29,0.75)');
     });
 
-    // moldura, linha de varredura e chiado forte (o "● REC" é DOM, ver setActiveCameraTab)
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(4, 4, W - 8, H - 8);
+    // linha de varredura e chiado forte (o "● REC" é DOM, ver setActiveCameraTab)
+    // (a moldura verde foi removida)
     ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(0, (Date.now() / 14) % H, W, 2);
     drawStaticNoise(ctx, W, H, (c.STATIC_NOISE_DENSITY || 45) * 3);
@@ -390,6 +446,7 @@ const UI = (() => {
   }
 
   function renderJumpscare(ctx, buffer, assetLoader, enemyId) {
+    setEnemyLayerShake(0, 0);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, buffer.width, buffer.height);
     const img = assetLoader.getImage(`enemies.${enemyId}.jumpscare`);
@@ -433,6 +490,32 @@ const UI = (() => {
     if (night) night.textContent = nightLabel;
   }
 
+  /** Cria (uma vez) o <img> do gif de "passou de noite" dentro de #victory-screen. */
+  function ensureVictoryGif() {
+    let el = document.getElementById('victory-gif');
+    if (!el) {
+      const host = document.getElementById('victory-screen');
+      if (!host) return null;
+      el = document.createElement('img');
+      el.id = 'victory-gif';
+      el.style.cssText = 'display:block;max-width:320px;width:60%;margin:14px auto;';
+      el.onerror = () => { el.style.display = 'none'; };
+      // Insere antes dos botões (title -> gif -> botões), se eles já existirem.
+      const buttons = host.querySelector('.screen-buttons');
+      if (buttons) host.insertBefore(el, buttons); else host.appendChild(el);
+    }
+    return el;
+  }
+
+  /** src vazio/nulo esconde o gif (ex.: quando ainda não existe o arquivo). */
+  function setVictoryGif(src) {
+    const el = ensureVictoryGif();
+    if (!el) return;
+    if (!src) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    if (el.getAttribute('src') !== src) el.src = src;
+  }
+
   function renderLeaderboard(el, highlightRank) {
     if (!el) return;
     const scores = window.Progression.getLeaderboard();
@@ -451,6 +534,9 @@ const UI = (() => {
     triggerCameraFlash,
     syncControls,
     setDoorButtonsState,
+    applyMonitorButtonIcons,
+    applyMenuButtonIcons,
+    applyMenuBackground,
     setEnemyOverlays,
     renderOffice,
     renderCameraMonitor,
@@ -458,6 +544,7 @@ const UI = (() => {
     drawStaticNoise,
     updateHud,
     renderLeaderboard,
+    setVictoryGif,
   };
 })();
 
