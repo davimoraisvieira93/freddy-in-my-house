@@ -37,6 +37,19 @@
     }
     .door-panel button[data-action]:disabled { cursor: not-allowed; }
     .door-panel button[data-action]:disabled .btn-icon { opacity: .4; }
+
+    /* Botão "Abrir Câmeras": sem esta regra, o ícone (PNG) aparecia no
+       tamanho natural do arquivo, que é grande demais. Ajuste o valor de
+       max-width abaixo para deixar maior/menor (é relativo à largura da
+       tela, então funciona bem em qualquer resolução). */
+    #btn-open-monitor.monitor-btn img.btn-icon {
+      display: block;
+      width: 10vw;
+      max-width: 90px;
+      min-width: 48px;
+      height: auto;
+      object-fit: contain;
+    }
     #hud-power.low, #hud-power-value.low { color: #ff4d4d; }
     .custom-level-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: #ddd; font: 13px monospace; }
     .leaderboard li.highlight { color: #4caf50; font-weight: bold; }
