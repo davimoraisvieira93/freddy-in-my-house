@@ -29,6 +29,14 @@
     .cam-tab { background: #1a1a1a; color: #ccc; border: 1px solid #444;
       padding: 6px 10px; cursor: pointer; font: 12px monospace; }
     .cam-tab.active { background: #4caf50; color: #000; border-color: #4caf50; }
+    .door-panel button[data-action] {
+      background: none; border: none; padding: 0; cursor: pointer;
+    }
+    .door-panel button[data-action] .btn-icon {
+      display: block; width: 56px; height: 56px; object-fit: contain; pointer-events: none;
+    }
+    .door-panel button[data-action]:disabled { cursor: not-allowed; }
+    .door-panel button[data-action]:disabled .btn-icon { opacity: .4; }
     #hud-power.low, #hud-power-value.low { color: #ff4d4d; }
     .custom-level-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: #ddd; font: 13px monospace; }
     .leaderboard li.highlight { color: #4caf50; font-weight: bold; }
