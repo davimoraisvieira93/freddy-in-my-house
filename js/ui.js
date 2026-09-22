@@ -185,19 +185,32 @@ const UI = (() => {
     });
   }
 
+  /** Troca o <img> de dentro do botão (cria o <img> na primeira vez). */
+  function setButtonImage(btn, src) {
+    if (!btn || !src) return;
+    let img = btn.querySelector('img.btn-icon');
+    if (!img) {
+      btn.textContent = '';
+      img = document.createElement('img');
+      img.className = 'btn-icon';
+      btn.appendChild(img);
+    }
+    if (img.getAttribute('src') !== src) img.src = src;
+  }
+
   function setDoorButtonsState(doors) {
+    const btnImgs = (window.ASSETS && window.ASSETS.images && window.ASSETS.images.ui) || {};
     Object.values(doors).forEach((door) => {
       const panel = document.querySelector(`.door-panel[data-door="${door.id}"]`);
       if (!panel) return;
-      const icon = door.id === 'janela' ? '🪟' : '🚪';
       const closeBtn = panel.querySelector('[data-action="toggle-door"]');
       const lightBtn = panel.querySelector('[data-action="toggle-light"]');
       if (closeBtn) {
-        closeBtn.textContent = `${icon} ${door.isClosed ? 'Abrir' : 'Fechar'}`;
+        setButtonImage(closeBtn, door.isClosed ? btnImgs.buttonDoorClose : btnImgs.buttonDoorOpen);
         closeBtn.classList.toggle('active', door.isClosed);
       }
       if (lightBtn) {
-        lightBtn.textContent = door.lightOn ? '💡 Apagar' : '💡 Luz';
+        setButtonImage(lightBtn, door.lightOn ? btnImgs.buttonLuzLigada : btnImgs.buttonLuzApagada);
         lightBtn.disabled = door.isClosed;
         lightBtn.classList.toggle('active', door.lightOn);
       }
