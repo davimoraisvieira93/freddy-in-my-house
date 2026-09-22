@@ -51,6 +51,10 @@ const ASSETS = {
       iconCamera: 'assets/images/ui/icon_camera.png',
       iconDoor: 'assets/images/ui/icon_door.png',
       iconLight: 'assets/images/ui/icon_light.png',
+      buttonLuzLigada: 'assets/images/ui/button_luz_ligada.png',
+      buttonLuzApagada: 'assets/images/ui/button_luz_apagada.png',
+      buttonDoorOpen: 'assets/images/ui/button_door_open.png',
+      buttonDoorClose: 'assets/images/ui/button_door_close.png',
     },
   },
 
