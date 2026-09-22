@@ -41,10 +41,10 @@
 
     /* Filtro "câmera de segurança" (game.js liga a classe .cam-feed no canvas) */
     #game-canvas.cam-feed {
-      filter: grayscale(.85) contrast(1.15) brightness(.92) sepia(.2) hue-rotate(70deg);
+      filter: none;
     }
     body:has(#game-canvas.cam-feed) #enemy-layer {
-      filter: grayscale(.85) contrast(1.15) brightness(.92) sepia(.2) hue-rotate(70deg);
+      filter: none;
     }
 
     /* "● REC Câm. N" em DOM: fica acima dos sprites em tela cheia */
