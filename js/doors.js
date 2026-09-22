@@ -1,7 +1,8 @@
 /* js/doors.js
  * createDoors(DOORS_CONFIG) -> { [doorId]: DoorState }
- * Cada porta guarda se está fechada e se a luz está acesa. Fechar a porta
- * apaga a luz (não dá pra segurar a luz com a porta fechada).
+ * Cada porta guarda se está fechada e se a luz está acesa. As duas mecânicas
+ * são INDEPENDENTES: fechar/abrir a porta não mexe na luz, e a luz pode ser
+ * ligada/desligada com a porta em qualquer estado.
  */
 function createDoors(config) {
   const doors = {};
@@ -17,10 +18,8 @@ function createDoors(config) {
       },
       toggleClosed() {
         this.isClosed = !this.isClosed;
-        if (this.isClosed) this.lightOn = false;
       },
       toggleLight() {
-        if (this.isClosed) return;
         this.lightOn = !this.lightOn;
       },
     };
