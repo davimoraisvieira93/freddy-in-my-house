@@ -124,6 +124,15 @@ canvas#game-canvas {
   padding: 12px 20px;
 }
 
+#btn-open-monitor.monitor-btn img.btn-icon {
+  display: block;
+  width: 10vw;
+  max-width: 90px;
+  min-width: 48px;
+  height: auto;
+  object-fit: contain;
+}
+
 /* Painel da porta: só aparece na vista da respectiva porta, na frente dela.
    Calibre left/bottom junto com DOOR_HITBOXES em config.js.                 */
 .door-panel {
