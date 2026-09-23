@@ -50,6 +50,26 @@ const ASSETS = {
       iconPower: 'assets/images/ui/icon_power.png',
       iconCamera: 'assets/images/ui/icon_camera.png',
       iconDoor: 'assets/images/ui/icon_door.png',
+      buttonDoorOpen: 'assets/images/ui/button_door_open.png',
+      buttonDoorClose: 'assets/images/ui/button_door_close.png',
+      // Botão de ABRIR o monitor (fica em #btn-open-monitor, dentro de #office-controls)
+      buttonCameraOpen: 'assets/images/ui/button_camera_open.png',
+      // Botão de FECHAR o monitor (fica em #btn-close-monitor, dentro de #camera-monitor)
+      buttonCameraClose: 'assets/images/ui/button_camera_close.png',
+      // GIF mostrado na tela de vitória, quando o jogador passa de noite.
+      gifNoiteCompleta: 'assets/images/ui/gif_noite_completa.gif',
+    },
+    // PNGs dos botões da tela de início (menu principal). Enquanto o arquivo
+    // não existir, o botão continua funcionando normalmente com o texto
+    // original (ver setButtonImage em ui.js) — só troca pra imagem quando o
+    // PNG carregar com sucesso.
+    menu: {
+      background: 'assets/images/menu/menu_background.png',      // fundo da tela de início (a imagem que você mandou)
+      buttonStart: 'assets/images/menu/button_start.png',         // "Começar Noite" / Novo Jogo
+      buttonCustom: 'assets/images/menu/button_custom.png',       // Custom Night
+      buttonInfinite: 'assets/images/menu/button_infinite.png',   // Modo Infinito
+      buttonLeaderboard: 'assets/images/menu/button_leaderboard.png', // Ranking
+      buttonExtras: 'assets/images/menu/button_extras.png',       // Extras (precisa de um botão #btn-extras no HTML)
     },
   },
 
