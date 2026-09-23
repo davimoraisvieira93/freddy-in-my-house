@@ -1,6 +1,6 @@
 /* js/power.js
- * Dreno de energia por segundo, somando porta fechada / luz acesa / monitor
- * aberto, multiplicado pelo powerDrainMultiplier da noite atual.
+ * Dreno de energia por segundo, somando porta fechada / monitor aberto,
+ * multiplicado pelo powerDrainMultiplier da noite atual.
  */
 class PowerSystem {
   constructor(constants, onBlackout) {
@@ -29,7 +29,6 @@ class PowerSystem {
     let drain = c.POWER_DRAIN_BASE_PER_SEC;
     for (const door of doorsArray) {
       if (door.isClosed) drain += c.POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC;
-      if (door.lightOn) drain += c.POWER_DRAIN_PER_LIGHT_ON_PER_SEC;
     }
     if (monitorOpen) drain += c.POWER_DRAIN_MONITOR_OPEN_PER_SEC;
     drain *= drainMultiplier;

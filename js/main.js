@@ -3,10 +3,7 @@
  * Novidades desta versão:
  *  - faz a "ponte" automática de globais declarados com const para window
  *  - checa também DOOR_HITBOXES (usado por ui.js) e as chaves de GAME_CONSTANTS
- *  - valida o config das visões fixas: VIEWS (objetos com backgrounds), portas
- *    citadas em doorId / 'entrada:*' e grafos dos inimigos que nunca chegam a
- *    uma entrada (inimigo que nunca ataca)
- *  - atalhos: A/D = porta/janela, Q/E = luz da porta/janela (só olhando pra ela)
+ *  - avisa se OFFICE_WORLD_WIDTH não bate com VIEWS.length × INTERNAL_WIDTH
  */
 (function bootstrap() {
   'use strict';
@@ -109,7 +106,7 @@
 
   // ------------------------------- 3) constantes faltando viram NaN silencioso
   const CONST_KEYS = [
-    'INTERNAL_WIDTH', 'INTERNAL_HEIGHT', 'VIEW_TRANSITION_MS',
+    'INTERNAL_WIDTH', 'INTERNAL_HEIGHT', 'OFFICE_WORLD_WIDTH', 'VIEW_SMOOTHING',
     'AI_TICK_INTERVAL_MS', 'NIGHT_DURATION_MS', 'HOURS_PER_NIGHT',
     'STATIC_NOISE_DENSITY', 'JITTER_MAX_PX', 'CAMERA_STATIC_FLASH_MS',
     'INFINITE_START_LEVEL', 'INFINITE_MAX_LEVEL', 'INFINITE_RAMP_MS', 'INFINITE_POWER_MULT',
@@ -119,36 +116,14 @@
     console.warn('[bootstrap] GAME_CONSTANTS sem estas chaves (viram NaN em silêncio):', missingConsts);
   }
 
-  // ------------------------- 3b) sanidade do config (visões fixas + grafos)
-  const doorIds = window.DOORS_CONFIG.map((d) => d.id);
-
-  window.VIEWS.forEach((v, i) => {
-    if (!v || typeof v !== 'object' || !v.id || !v.backgrounds) {
-      console.warn(`[bootstrap] VIEWS[${i}] deveria ser { id, backgrounds, ... }:`, v);
-      return;
-    }
-    if (v.doorId && !doorIds.includes(v.doorId)) {
-      console.warn(`[bootstrap] VIEWS[${i}] (${v.id}) controla doorId "${v.doorId}", que não existe em DOORS_CONFIG.`);
-    }
-    if (v.doorId && !window.DOOR_HITBOXES[v.doorId]) {
-      console.warn(`[bootstrap] DOOR_HITBOXES não tem "${v.doorId}" (o rótulo e o inimigo não aparecem).`);
-    }
-  });
-
-  window.ENEMIES_CONFIG.forEach((cfg) => {
-    const lock = cfg.lockNode && cfg.lockNode.nodeId;
-    const reachesEntry = (node, seen) => {
-      const s = String(node);
-      if (s.startsWith('entrada:')) return doorIds.includes(s.slice('entrada:'.length));
-      if (node === lock) return true;
-      if (seen.has(node)) return false;
-      seen.add(node);
-      return (cfg.graph[node] || []).some((next) => reachesEntry(next, seen));
-    };
-    if (!reachesEntry(cfg.startNode, new Set())) {
-      console.warn(`[bootstrap] ${cfg.label}: a rota nunca chega a uma 'entrada:*' válida — ele nunca vai atacar.`);
-    }
-  });
+  const expectedWorld = window.VIEWS.length * window.GAME_CONSTANTS.INTERNAL_WIDTH;
+  if (window.GAME_CONSTANTS.OFFICE_WORLD_WIDTH !== expectedWorld) {
+    console.warn(
+      `[bootstrap] OFFICE_WORLD_WIDTH = ${window.GAME_CONSTANTS.OFFICE_WORLD_WIDTH}, ` +
+      `mas VIEWS.length × INTERNAL_WIDTH = ${expectedWorld}. ` +
+      'O escritório vai desalinhar ao virar para os lados.',
+    );
+  }
 
   // --------------------------------------------------------- 4) música do menu
   const BEATBOX_SRC = 'assets/audio/sfx/beatbox.mp3';
@@ -262,9 +237,10 @@
     document.querySelectorAll('[data-action="toggle-door"]').forEach((btn) => {
       btn.addEventListener('click', () => game && game.toggleDoor(btn.dataset.door));
     });
-    document.querySelectorAll('[data-action="toggle-light"]').forEach((btn) => {
-      btn.addEventListener('click', () => game && game.toggleLight(btn.dataset.door));
-    });
+    // A mecânica da luz foi removida. Se o index.html ainda tiver botões
+    // data-action="toggle-light", eles saem do DOM aqui (depois de limpar o
+    // HTML, pode apagar esta linha).
+    document.querySelectorAll('[data-action="toggle-light"]').forEach((btn) => btn.remove());
     on('btn-open-monitor', 'click', () => game && game.toggleMonitor());
   }
 
@@ -294,10 +270,8 @@
       const k = e.key.toLowerCase();
       if (k === 'arrowleft')  { e.preventDefault(); game.turn(-1); }
       if (k === 'arrowright') { e.preventDefault(); game.turn(1); }
-      if (k === 'a') game.toggleDoor('porta');
-      if (k === 'd') game.toggleDoor('janela');
-      if (k === 'q') game.toggleLight('porta');
-      if (k === 'e') game.toggleLight('janela');
+      if (k === 'a') game.toggleDoor('esquerda');
+      if (k === 'd') game.toggleDoor('direita');
       if (k === ' ') { e.preventDefault(); game.toggleMonitor(); }
     });
   }

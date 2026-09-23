@@ -50,36 +50,12 @@ const ASSETS = {
       iconPower: 'assets/images/ui/icon_power.png',
       iconCamera: 'assets/images/ui/icon_camera.png',
       iconDoor: 'assets/images/ui/icon_door.png',
-      iconLight: 'assets/images/ui/icon_light.png',
-      buttonLuzLigada: 'assets/images/ui/button_luz_ligada.png',
-      buttonLuzApagada: 'assets/images/ui/button_luz_apagada.png',
-      buttonDoorOpen: 'assets/images/ui/button_door_open.png',
-      buttonDoorClose: 'assets/images/ui/button_door_close.png',
-      // Botão de ABRIR o monitor (fica em #btn-open-monitor, dentro de #office-controls)
-      buttonCameraOpen: 'assets/images/ui/button_camera_open.png',
-      // Botão de FECHAR o monitor (fica em #btn-close-monitor, dentro de #camera-monitor)
-      buttonCameraClose: 'assets/images/ui/button_camera_close.png',
-      // GIF mostrado na tela de vitória, quando o jogador passa de noite.
-      gifNoiteCompleta: 'assets/images/ui/gif_noite_completa.gif',
-    },
-    // PNGs dos botões da tela de início (menu principal). Enquanto o arquivo
-    // não existir, o botão continua funcionando normalmente com o texto
-    // original (ver setButtonImage em ui.js) — só troca pra imagem quando o
-    // PNG carregar com sucesso.
-    menu: {
-      background: 'assets/images/menu/menu_background.png',      // fundo da tela de início (a imagem que você mandou)
-      buttonStart: 'assets/images/menu/button_start.png',         // "Começar Noite" / Novo Jogo
-      buttonCustom: 'assets/images/menu/button_custom.png',       // Custom Night
-      buttonInfinite: 'assets/images/menu/button_infinite.png',   // Modo Infinito
-      buttonLeaderboard: 'assets/images/menu/button_leaderboard.png', // Ranking
-      buttonExtras: 'assets/images/menu/button_extras.png',       // Extras (precisa de um botão #btn-extras no HTML)
     },
   },
 
   audio: {
     ambience: 'assets/audio/ambience/ambience_loop.mp3',
     doorToggle: 'assets/audio/sfx/door_toggle.mp3',
-    lightToggle: 'assets/audio/sfx/light_toggle.mp3',
     cameraStatic: 'assets/audio/sfx/camera_static.mp3',
     powerLow: 'assets/audio/sfx/power_low.mp3',
     blackout: 'assets/audio/sfx/blackout.mp3',
@@ -126,7 +102,7 @@ const ROOMS = [
   { id: 'cam8', label: 'Câm. 8' },
 ];
 
-// A janela usa a mesma mecânica da porta (fechar/abrir, luz, dreno de energia).
+// A janela usa a mesma mecânica da porta (fechar/abrir e dreno de energia).
 const DOORS_CONFIG = [
   { id: 'porta', label: 'Porta' },
   { id: 'janela', label: 'Janela' },
@@ -228,7 +204,6 @@ const GAME_CONSTANTS = {
   POWER_MAX: 100,
   POWER_DRAIN_BASE_PER_SEC: 0.18,              // era 0.04
   POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC: 0.10,
-  POWER_DRAIN_PER_LIGHT_ON_PER_SEC: 0.12,
   POWER_DRAIN_MONITOR_OPEN_PER_SEC: 0.16,
   POWER_LOW_WARNING_THRESHOLD: 20,
 

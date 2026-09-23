@@ -36,7 +36,6 @@ class Game {
     this.slide = null; // { from, to, dir, t } enquanto o giro está animando
 
     UI.buildCameraTabs(window.ROOMS, (roomId) => this.switchCameraRoom(roomId));
-    UI.applyMonitorButtonIcons();
     this._resizeCanvas();
     this._setupInputs();
   }
@@ -121,9 +120,7 @@ class Game {
   _currentNight() {
     const c = this.constants;
     if (this.mode === 'custom') {
-      // Rótulo do HUD (só aparece durante a partida, via updateHud); a tela
-      // de vitória continua chamando isso de "Custom Night".
-      return { label: 'Noite 7', aggression: this.customLevels, powerDrainMultiplier: 1.2 };
+      return { label: 'Custom Night', aggression: this.customLevels, powerDrainMultiplier: 1.2 };
     }
     if (this.mode === 'infinite') {
       const level = Math.min(
@@ -150,13 +147,6 @@ class Game {
     if (!this._canActOnDoor(doorId)) return;
     this.doors[doorId].toggleClosed();
     this.assetLoader.playSfx('doorToggle');
-    UI.setDoorButtonsState(this.doors);
-  }
-
-  toggleLight(doorId) {
-    if (!this._canActOnDoor(doorId)) return;
-    this.doors[doorId].toggleLight();
-    this.assetLoader.playSfx('lightToggle');
     UI.setDoorButtonsState(this.doors);
   }
 
@@ -191,7 +181,7 @@ class Game {
   }
 
   _onBlackout() {
-    Object.values(this.doors).forEach((d) => { d.isClosed = false; d.lightOn = false; });
+    Object.values(this.doors).forEach((d) => { d.isClosed = false; });
     this.cameras.close();
     this._setCameraFeed(false);
     document.getElementById('camera-monitor').classList.add('hidden');
@@ -269,7 +259,6 @@ class Game {
 
     document.getElementById('victory-title').textContent = title;
     document.getElementById('btn-next-night').classList.toggle('hidden', !isStory || isLast);
-    UI.setVictoryGif((window.ASSETS.images.ui || {}).gifNoiteCompleta);
     UI.showScreen('victory-screen');
   }
 
