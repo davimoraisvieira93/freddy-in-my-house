@@ -29,7 +29,7 @@ Mesma lista de antes, mais um novo efeito:
 | Onde entra | Caminho esperado |
 |---|---|
 | Risada do Freddy ao se mover com sucesso | `assets/audio/sfx/risada.mp3` |
-| Ambiente, porta, luz, estática, energia baixa, apagão, batida, jumpscare, vitória | ver os demais nomes em `js/config.js` (`ASSETS.audio`), todos dentro de `assets/audio/` |
+| Ambiente, porta, estática, energia baixa, apagão, batida, jumpscare, vitória | ver os demais nomes em `js/config.js` (`ASSETS.audio`), todos dentro de `assets/audio/` |
 
 ## Trocando os personagens pelos seus
 
