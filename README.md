@@ -105,34 +105,35 @@ de qualquer inimigo que esteja passando por ali naquele momento
 
 ## Mecânica da luz — removida (o que você precisa saber)
 
-A luz de checagem (botão 💡 Luz / Apagar) saiu do jogo. Portas e janelas
-agora só têm um estado: **aberta ou fechada**.
+A luz de checagem (botão 💡 Luz e todo o resto ligado a ela) saiu do jogo
+por completo. Portas e janelas agora só têm um estado: **aberta ou fechada**.
 
-### O que mudou no código
+### O que mudou
 
 | Arquivo | Alteração |
 |---|---|
+| `index.html` | Apagados os dois botões `data-action="toggle-light"` (Porta e Janela). Cada `.door-panel` agora tem só o botão Fechar/Abrir. |
 | `js/doors.js` | Removidos `lightOn` e `toggleLight()`. `toggleClosed()` só alterna `isClosed`. |
 | `js/power.js` | O dreno da luz saiu do cálculo de energia. |
-| `js/config.js` | Removidos `POWER_DRAIN_PER_LIGHT_ON_PER_SEC`, o som `audio.lightToggle` e a imagem `images.ui.iconLight`. |
+| `js/config.js` | Removidos `POWER_DRAIN_PER_LIGHT_ON_PER_SEC`, o som `audio.lightToggle` e as imagens `ui.iconLight`, `ui.buttonLuzLigada` e `ui.buttonLuzApagada`. |
 | `js/game.js` | Removido `toggleLight()`. O apagão não mexe mais em `lightOn`. |
-| `js/ui.js` | `setDoorButtonsState()` só atualiza o texto do botão Fechar/Abrir. |
-| `js/main.js` | Removidos o clique dos botões de luz e os atalhos **Q** e **E** (o **E** do Modo Admin, que recarrega a energia, continua funcionando). |
+| `js/ui.js` | `setDoorButtonsState()` só cuida do botão Fechar/Abrir. Removido o tom amarelado que a luz desenhava sobre a porta/janela em `drawDoorLayer()`. |
+| `js/main.js` | Removidos o clique dos botões de luz e os atalhos **Q** e **E**. Os atalhos **A** (porta) e **D** (janela) continuam. O **E** do Modo Admin (recarregar energia) também continua. |
 | `css/style.css` | Removida a regra `button[data-action="toggle-light"].active`. |
 | `ASSETS-GUIDE.md` | Tirada a menção ao som de luz. |
 
-### O que você ainda precisa fazer
+### O que você precisa fazer
 
-1. **`index.html`** — esse arquivo não estava entre os que revisei, então
-   não mexi nele. Apague o botão de luz de cada `.door-panel`, ou seja,
-   toda linha com `data-action="toggle-light"`. Se você esquecer, nada
-   quebra: o `main.js` remove esses botões ao iniciar o jogo. Mesmo assim,
-   vale limpar o HTML e depois apagar a linha marcada com o comentário
-   "A mecânica da luz foi removida" em `wireOfficeControls()`.
-2. **Assets (opcional):** pode apagar `assets/audio/sfx/light_toggle.mp3` e
-   `assets/images/ui/icon_light.png`. Nada mais carrega esses arquivos.
-3. **Textos e tutoriais:** se algum lugar do jogo, do README ou de uma
-   página de divulgação ensina "use a luz" ou os atalhos Q/E, atualize.
+1. **Substituir os arquivos** pelos novos e dar um recarregamento forçado no
+   navegador (Ctrl+F5). Um `main.js` ou `index.html` antigo em cache ainda
+   mostra ou tenta usar a luz.
+2. **Apagar os assets da luz (opcional).** Nada mais os carrega:
+   - `assets/audio/sfx/light_toggle.mp3`
+   - `assets/images/ui/icon_light.png`
+   - `assets/images/ui/button_luz_ligada.png`
+   - `assets/images/ui/button_luz_apagada.png`
+3. **Atualizar textos e tutoriais.** Se algum lugar do jogo, do README ou de
+   uma página de divulgação ensina "use a luz" ou os atalhos Q/E, corrija.
 
 ### Efeito no balanceamento
 
@@ -140,14 +141,14 @@ agora só têm um estado: **aberta ou fechada**.
   tempo todo, uma noite de 300 s gastava 36 % a mais. Esse custo não existe mais.
 - Quem quase não usava a luz não sente diferença. Quem usava vai chegar às
   6h com mais bateria sobrando.
-- Se o jogo ficar fácil demais, o ajuste é em `js/config.js`:
+- Se o jogo ficar fácil demais, ajuste em `js/config.js`:
   `POWER_DRAIN_BASE_PER_SEC`, `POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC`,
   `POWER_DRAIN_MONITOR_OPEN_PER_SEC` ou o `powerDrainMultiplier` de cada
   noite em `NIGHTS_CONFIG`.
-- **A IA e o desenho dos inimigos não mudam.** Nos arquivos que revisei,
-  nada lia `lightOn` para decidir o que aparece na tela ou quando um
-  inimigo ataca; a luz só gastava bateria. Se o seu `ui.js` local usa
-  `lightOn` para revelar o inimigo, precisa remover isso também.
+- **A IA e o ataque dos inimigos não mudam.** A luz só gastava bateria e
+  pintava um tom amarelado sobre a porta; ela nunca decidiu quando um
+  inimigo aparece, bate ou ataca. O inimigo continua visível na entrada
+  sempre que a porta/janela estiver aberta.
 
 ## Aviso sobre o repositório indicado como referência
 
