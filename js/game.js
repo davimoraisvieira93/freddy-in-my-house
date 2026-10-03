@@ -77,6 +77,8 @@ class Game {
   turn(dir) {
     if (this.state !== 'playing' || this.cameras.isOpen || this.power.isBlackedOut || this.slide) return;
     if (this.tabletOpen || this.freddyEncounter) return;
+    // Virou para outro lado: tira a máscara (ela só existe na vista da porta).
+    if (this.maskOn) { this.maskOn = false; UI.setMask(false); }
     const n = window.VIEWS.length;
     const step = dir > 0 ? 1 : -1;
     const from = this.viewIndex;
@@ -222,8 +224,10 @@ class Game {
 
   /** Coloca/tira a máscara. Só faz sentido com o Freddy na sala. */
   toggleMask() {
-    if (this.state !== 'playing' || !this.freddyEncounter) return;
+    if (this.state !== 'playing') return;
     if (this.view !== 'porta') return; // a máscara só existe na vista da porta
+    if (this.cameras.isOpen || this.tabletOpen) return;
+    if (this.power.isBlackedOut && !this.freddyEncounter) return;
     this.maskOn = !this.maskOn;
     UI.setMask(this.maskOn);
     UI.syncControls(this);
@@ -231,9 +235,8 @@ class Game {
 
   /** Freddy entrou: puxa o jogador para a vista da porta e começa a contagem. */
   _startFreddyEncounter(enemyId) {
+    // Se a máscara já estava colocada, ela continua (conta como proteção).
     this.freddyEncounter = { id: enemyId, noMaskMs: 0, maskMs: 0 };
-    this.maskOn = false;
-    UI.setMask(false);
 
     if (this.cameras.isOpen) {
       this.cameras.close();

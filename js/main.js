@@ -266,7 +266,7 @@
     });
     // Câmeras e máscara agem ao passar o mouse (uma vez por entrada).
     on('btn-open-monitor', 'pointerenter', () => UI.hoverAct(() => game && game.toggleMonitor()));
-    on('btn-open-tablet', 'click', () => game && game.toggleTablet());
+    on('btn-open-tablet', 'pointerenter', () => UI.hoverAct(() => game && game.toggleTablet()));
     on('btn-mask', 'pointerenter', () => UI.hoverAct(() => game && game.toggleMask()));
     on('btn-close-tablet', 'click', () => game && game.toggleTablet());
     on('btn-reboot-cameras', 'click', () => game && game.rebootCameras());

@@ -43,15 +43,15 @@
        max-width abaixo para deixar maior/menor (é relativo à largura da
        tela, então funciona bem em qualquer resolução). */
     /* TAMANHO dos botões grandes (câmeras, fechar câmeras, máscara, tablet).
-       Para aumentar/diminuir tudo de uma vez, mude só --big-btn
+       Para aumentar/diminuir tudo de uma vez, mude só --big-btn-w (largura) e --big-btn-h (altura)
        (mínimo, ideal relativo à tela, máximo). */
-    :root { --big-btn: clamp(110px, 16vw, 220px); }
+    :root { --big-btn-w: clamp(180px, 28vw, 420px); --big-btn-h: clamp(60px, 8vw, 110px); }
     #btn-open-monitor.monitor-btn img.btn-icon,
     #btn-close-monitor img.btn-icon {
       display: block;
-      width: var(--big-btn);
-      height: auto;
-      object-fit: contain;
+      width: var(--big-btn-w);
+      height: var(--big-btn-h);
+      object-fit: fill;
     }
     #hud-power.low, #hud-power-value.low { color: #ff4d4d; }
     .custom-level-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: #ddd; font: 13px monospace; }
@@ -77,13 +77,26 @@
     #mask-overlay img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     /* Mesmo estilo/posição do botão de câmeras, mas ao lado dele (à direita). */
     #btn-mask { position: absolute; bottom: 24px; left: 50%;
-      margin-left: calc(var(--big-btn) / 2 + 22px); /* ao lado do botão de câmeras */
+      margin-left: calc(var(--big-btn-w) / 2 + 22px); /* ao lado do botão de câmeras */
       font-size: 15px; padding: 12px 20px; }
     #btn-mask.active { border-color: #3fae5c; color: #3fae5c; }
     #btn-mask img.btn-icon, #btn-open-tablet img.btn-icon {
-      display: block; width: var(--big-btn); height: auto; object-fit: contain; }
+      display: block; width: var(--big-btn-w); height: var(--big-btn-h); object-fit: fill; }
     #btn-open-tablet { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
       font-size: 15px; padding: 12px 20px; }
+
+    /* Tamanho também quando o botão ainda é só TEXTO (sem o PNG): sem isto, o
+       aumento só valia para quem já tem as imagens dos botões. */
+    #btn-open-monitor, #btn-close-monitor, #btn-mask, #btn-open-tablet {
+      min-width: var(--big-btn-w);
+      min-height: var(--big-btn-h);
+      font-size: clamp(18px, 2.2vw, 28px);
+      padding: 14px 22px;
+    }
+    #btn-open-monitor:has(img), #btn-close-monitor:has(img),
+    #btn-mask:has(img), #btn-open-tablet:has(img) {
+      min-height: 0; padding: 12px 20px;
+    }
 
     /* Tablet de reboot das câmeras (só abre na vista do Sistema). */
     #reboot-tablet { position: absolute; inset: 0; z-index: 12; display: flex;
@@ -227,7 +240,8 @@ const UI = (() => {
     // botão da máscara: só enquanto o Freddy está na sala
     const maskBtn = document.getElementById('btn-mask');
     if (maskBtn) {
-      maskBtn.classList.toggle('hidden', !encounter || view.id !== 'porta');
+      // sempre visível na vista da porta (some só com câmeras/tablet abertos ou sem energia)
+      maskBtn.classList.toggle('hidden', (blocked && !encounter) || view.id !== 'porta');
       maskBtn.classList.toggle('active', !!game.maskOn);
     }
 
