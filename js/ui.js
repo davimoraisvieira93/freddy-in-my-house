@@ -42,11 +42,14 @@
        tamanho natural do arquivo, que é grande demais. Ajuste o valor de
        max-width abaixo para deixar maior/menor (é relativo à largura da
        tela, então funciona bem em qualquer resolução). */
-    #btn-open-monitor.monitor-btn img.btn-icon {
+    /* TAMANHO dos botões grandes (câmeras, fechar câmeras, máscara, tablet).
+       Para aumentar/diminuir tudo de uma vez, mude só --big-btn
+       (mínimo, ideal relativo à tela, máximo). */
+    :root { --big-btn: clamp(110px, 16vw, 220px); }
+    #btn-open-monitor.monitor-btn img.btn-icon,
+    #btn-close-monitor img.btn-icon {
       display: block;
-      width: 10vw;
-      max-width: 90px;
-      min-width: 48px;
+      width: var(--big-btn);
       height: auto;
       object-fit: contain;
     }
@@ -73,11 +76,12 @@
       background: radial-gradient(ellipse at center, rgba(0,0,0,.35) 30%, rgba(0,0,0,.92) 100%); }
     #mask-overlay img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     /* Mesmo estilo/posição do botão de câmeras, mas ao lado dele (à direita). */
-    #btn-mask { position: absolute; bottom: 24px; left: 50%; margin-left: 70px;
+    #btn-mask { position: absolute; bottom: 24px; left: 50%;
+      margin-left: calc(var(--big-btn) / 2 + 22px); /* ao lado do botão de câmeras */
       font-size: 15px; padding: 12px 20px; }
     #btn-mask.active { border-color: #3fae5c; color: #3fae5c; }
     #btn-mask img.btn-icon, #btn-open-tablet img.btn-icon {
-      display: block; width: 10vw; max-width: 90px; min-width: 48px; height: auto; object-fit: contain; }
+      display: block; width: var(--big-btn); height: auto; object-fit: contain; }
     #btn-open-tablet { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
       font-size: 15px; padding: 12px 20px; }
 
@@ -223,7 +227,8 @@ const UI = (() => {
     // botão da máscara: só enquanto o Freddy está na sala
     const maskBtn = document.getElementById('btn-mask');
     if (maskBtn) {
-      maskBtn.classList.toggle('hidden', !encounter || view.id !== 'porta');
+      // sempre visível na vista da porta (some só com câmeras/tablet abertos ou sem energia)
+      maskBtn.classList.toggle('hidden', (blocked && !encounter) || view.id !== 'porta');
       maskBtn.classList.toggle('active', !!game.maskOn);
     }
 
