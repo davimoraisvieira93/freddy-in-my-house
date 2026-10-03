@@ -227,8 +227,7 @@ const UI = (() => {
     // botão da máscara: só enquanto o Freddy está na sala
     const maskBtn = document.getElementById('btn-mask');
     if (maskBtn) {
-      // sempre visível na vista da porta (some só com câmeras/tablet abertos ou sem energia)
-      maskBtn.classList.toggle('hidden', (blocked && !encounter) || view.id !== 'porta');
+      maskBtn.classList.toggle('hidden', !encounter || view.id !== 'porta');
       maskBtn.classList.toggle('active', !!game.maskOn);
     }
 
