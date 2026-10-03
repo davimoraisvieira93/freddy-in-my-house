@@ -28,6 +28,12 @@
       <!-- só aparece na visão marcada com monitorButton em VIEWS (Porta) — controlado por UI.syncControls -->
       <button id="btn-open-monitor" class="monitor-btn hidden">📺 Câmeras</button>
 
+      <!-- só aparece na visão do Sistema (VIEWS com tablet: true), à esquerda do computador -->
+      <button id="btn-open-tablet" class="hidden">📟 Tablet</button>
+
+      <!-- só aparece enquanto o Freddy está na sala -->
+      <button id="btn-mask" class="hidden">🎭 Máscara</button>
+
       <!-- cada painel só aparece na visão que controla a respectiva porta/janela.
            O texto "PORTA"/"JANELA" é desenhado no canvas. -->
       <div class="door-panel hidden" data-door="porta">
@@ -42,6 +48,19 @@
     <div id="camera-monitor" class="hidden">
       <div id="camera-tabs"></div>
       <button id="btn-close-monitor">✕ Fechar Monitor</button>
+    </div>
+
+    <!-- Tablet de reboot das câmeras -->
+    <div id="reboot-tablet" class="hidden">
+      <div class="tablet-panel">
+        <h2>Sistema de Câmeras</h2>
+        <div id="tablet-status" class="ok">SISTEMA DE CÂMERAS: ONLINE</div>
+        <div class="tablet-bar"><div id="tablet-bar-fill"></div></div>
+        <div class="tablet-buttons">
+          <button id="btn-reboot-cameras">🔄 Reiniciar câmeras</button>
+          <button id="btn-close-tablet">✕ Fechar Tablet</button>
+        </div>
+      </div>
     </div>
 
     <div id="loading-screen" class="screen"><h1>Carregando…</h1></div>

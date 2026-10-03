@@ -39,3 +39,18 @@ da família, um pet) e os arquivos de imagem/som correspondentes. As rotas
 (`graph`) e a mecânica especial da Câm 2 (`lockNode`) continuam funcionando
 normalmente, independente do nome escolhido — vale renomear antes de
 publicar o repositório publicamente.
+
+## Novos assets (reboot das câmeras e máscara)
+
+Todos opcionais: sem o arquivo, o jogo mostra um placeholder/texto.
+
+| Onde entra | Caminho esperado |
+|---|---|
+| Vista do Sistema (à esquerda do computador, onde fica o tablet) | `assets/images/office/reboot.png` |
+| Freddy dentro da sala (aparece na vista da porta) | `assets/images/enemies/freddy_na_sala.png` |
+| **Máscara** (PNG em tela cheia, 16:9, pode ter transparência no meio) | `assets/images/ui/mask.png` |
+| Ícone do botão da máscara | `assets/images/ui/button_mask.png` |
+| Ícone do botão do tablet | `assets/images/ui/button_tablet.png` |
+
+Atalhos: **M** = máscara, **Espaço** = monitor (no computador) ou tablet (na vista do Sistema).
+Ajustes de tempo (queda das câmeras, reboot, máscara) ficam em `GAME_CONSTANTS` no `js/config.js`.
