@@ -22,7 +22,7 @@ class PowerSystem {
     return !this.isBlackedOut && this.value <= this.constants.POWER_LOW_WARNING_THRESHOLD;
   }
 
-  tick(dtSec, doorsArray, monitorOpen, drainMultiplier = 1) {
+  tick(dtSec, doorsArray, monitorOpen, drainMultiplier = 1, extraDrain = 0) {
     if (this.isBlackedOut) return;
     const c = this.constants;
 
@@ -31,6 +31,7 @@ class PowerSystem {
       if (door.isClosed) drain += c.POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC;
     }
     if (monitorOpen) drain += c.POWER_DRAIN_MONITOR_OPEN_PER_SEC;
+    drain += extraDrain;
     drain *= drainMultiplier;
 
     this.value = Math.max(0, this.value - drain * dtSec);

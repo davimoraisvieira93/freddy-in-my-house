@@ -8,6 +8,7 @@ const ASSETS = {
       portaFechada:  'assets/images/office/porta_fechada.png',  // Visão 1 — porta fechada
       janelaAberta:  'assets/images/office/janela_aberta.png',  // Visão 2 — janela aberta
       janelaFechada: 'assets/images/office/janela_fechada.png', // Visão 2 — janela fechada
+      reboot:        'assets/images/office/reboot.png',         // Visão 3 — sistema de reboot (à ESQUERDA do centro)
     },
     cameras: {
       cam1: 'assets/images/cameras/cam1.png',
@@ -26,6 +27,7 @@ const ASSETS = {
         cam3: 'assets/images/enemies/freddy_cam3.png',
         cam5: 'assets/images/enemies/freddy_cam5.png',
         cam2: 'assets/images/enemies/freddy_cam2.png',
+        naSala: 'assets/images/enemies/freddy_na_sala.png', // NOVO — Freddy dentro da sala (vista da porta); coloque a máscara!
         jumpscare: 'assets/images/enemies/freddy_jumpscare.png',
       },
       bonnie: {
@@ -58,6 +60,13 @@ const ASSETS = {
       buttonCameraClose: 'assets/images/ui/button_camera_close.png',
       // GIF mostrado na tela de vitória, quando o jogador passa de noite.
       gifNoiteCompleta: 'assets/images/ui/gif_noite_completa.gif',
+      // NOVO — Máscara do Freddy: PNG em tela cheia (com transparência no meio, se quiser)
+      // mostrado por cima de tudo enquanto a máscara está colocada.
+      mask: 'assets/images/ui/mask.png',
+      // NOVO — ícone do botão de colocar/tirar a máscara (opcional; sem o arquivo, aparece o texto)
+      buttonMask: 'assets/images/ui/button_mask.png',
+      // NOVO — ícone do botão do tablet de reboot (opcional)
+      buttonTablet: 'assets/images/ui/button_tablet.png',
     },
     // PNGs dos botões da tela de início (menu principal). Enquanto o arquivo
     // não existir, o botão continua funcionando normalmente com o texto
@@ -109,6 +118,12 @@ const VIEWS = [
   {
     id: 'janela', label: 'Janela', doorId: 'janela',
     backgrounds: { open: 'office.janelaAberta', closed: 'office.janelaFechada' },
+  },
+  // Visão 3 — fica à ESQUERDA do centro (virar à esquerda a partir do Computador).
+  // tablet: true = o botão do tablet de reboot só aparece aqui.
+  {
+    id: 'reboot', label: 'Sistema', doorId: null, tablet: true,
+    backgrounds: { default: 'office.reboot' },
   },
 ];
 const ROOMS = [
@@ -163,6 +178,9 @@ const ENEMIES_CONFIG = [
       cam2: [],
     },
     onMoveSfx: 'risada',
+    moveIntervalMs: 3020, // FNAF 1: Freddy tenta se mover a cada 3,02 s
+    // Ao estourar o timer ele ENTRA na sala (não é mais jumpscare direto): você é
+    // puxado para a vista da porta e precisa colocar a máscara (ver FREDDY_* abaixo).
     lockNode: { nodeId: 'cam2', timeoutMs: 20000, doorId: 'porta' },
   },
 
@@ -172,6 +190,7 @@ const ENEMIES_CONFIG = [
     id: 'bonnie',
     label: 'Bonnie',
     startNode: 'cam8',
+    moveIntervalMs: 4970, // FNAF 1: Bonnie a cada 4,97 s
     graph: {
       cam8: ['cam3'],
       cam3: ['cam2', 'cam4'],
@@ -189,6 +208,7 @@ const ENEMIES_CONFIG = [
     id: 'chica',
     label: 'Chica',
     startNode: 'cam8',
+    moveIntervalMs: 4980, // FNAF 1: Chica a cada 4,98 s
     graph: {
       cam8: ['cam7'],
       cam7: ['cam6'],
@@ -201,13 +221,30 @@ const ENEMIES_CONFIG = [
 
 // Bateria: o dreno base subiu (0.04 → 0.18/s) e o multiplicador cresce pouco
 // entre as noites, então o aperto é grande desde a Noite 1.
+//
+// DIFICULDADE DO FNAF 1 (nível de IA 0–20 por noite; o Foxy não existe aqui):
+//          Freddy  Bonnie  Chica
+//   Noite 1:   0      0      0   (só sobe com os bônus por hora, abaixo)
+//   Noite 2:   0      3      1
+//   Noite 3:   1      0      5
+//   Noite 4:   2      2      4   (no original o Freddy sorteia 1 ou 2)
+//   Noite 5:   3      5      7
+//   Noite 6:   4     10     12
 const NIGHTS_CONFIG = [
-  { label: 'Noite 1', aggression: { freddy: 1, bonnie: 1, chica: 1 }, powerDrainMultiplier: 1.0 },
-  { label: 'Noite 2', aggression: { freddy: 2, bonnie: 2, chica: 2 }, powerDrainMultiplier: 1.0 },
-  { label: 'Noite 3', aggression: { freddy: 3, bonnie: 4, chica: 3 }, powerDrainMultiplier: 1.05 },
-  { label: 'Noite 4', aggression: { freddy: 5, bonnie: 5, chica: 5 }, powerDrainMultiplier: 1.1 },
-  { label: 'Noite 5', aggression: { freddy: 6, bonnie: 7, chica: 7 }, powerDrainMultiplier: 1.15 },
+  { label: 'Noite 1', aggression: { freddy: 0, bonnie: 0,  chica: 0 },  powerDrainMultiplier: 1.0 },
+  { label: 'Noite 2', aggression: { freddy: 0, bonnie: 3,  chica: 1 },  powerDrainMultiplier: 1.0 },
+  { label: 'Noite 3', aggression: { freddy: 1, bonnie: 0,  chica: 5 },  powerDrainMultiplier: 1.05 },
+  { label: 'Noite 4', aggression: { freddy: 2, bonnie: 2,  chica: 4 },  powerDrainMultiplier: 1.1 },
+  { label: 'Noite 5', aggression: { freddy: 3, bonnie: 5,  chica: 7 },  powerDrainMultiplier: 1.15 },
+  { label: 'Noite 6', aggression: { freddy: 4, bonnie: 10, chica: 12 }, powerDrainMultiplier: 1.2 },
 ];
+
+// Como no FNAF 1, a IA sobe +1 em certas horas da noite (só na campanha).
+// Os números são as horas do relógio: 2 = 2 AM, 3 = 3 AM, 4 = 4 AM.
+const HOURLY_BUMPS = {
+  bonnie: [2, 3, 4],
+  chica: [3, 4],
+};
 
 const GAME_CONSTANTS = {
   HOURS_PER_NIGHT: 6,
@@ -226,10 +263,23 @@ const GAME_CONSTANTS = {
   POWER_DRAIN_PER_DOOR_CLOSED_PER_SEC: 0.10,
   POWER_DRAIN_MONITOR_OPEN_PER_SEC: 0.16,
   POWER_LOW_WARNING_THRESHOLD: 20,
+  POWER_DRAIN_TABLET_PER_SEC: 0.08,            // tablet de reboot aberto
 
   DOOR_ATTACK_GRACE_MS: 4000,
-  DOOR_KNOCK_RETREAT_MS: 3000,
+  // Quanto tempo o inimigo FICA na porta/janela depois que você a fecha, antes de
+  // desistir. Conta só o tempo com a porta fechada (antes contava desde que ele
+  // chegou, por isso sumiam rápido demais). Era 3000.
+  DOOR_KNOCK_RETREAT_MS: 9000,
   ENEMY_RETREAT_COOLDOWN_MS: 8000,
+
+  // Freddy dentro da sala: você é puxado para a vista da porta.
+  FREDDY_MASK_GRACE_MS: 3500,   // tempo para colocar a máscara antes do jumpscare
+  FREDDY_LEAVE_MS: 4500,        // tempo com a máscara colocada até ele ir embora
+
+  // Sistema de câmeras: cai sozinho de tempos em tempos; reinicie pelo tablet.
+  CAMERA_FAIL_MIN_MS: 40000,
+  CAMERA_FAIL_MAX_MS: 75000,
+  CAMERA_REBOOT_MS: 7000,
 
   // Motor visual
   INTERNAL_WIDTH: 480,
@@ -253,4 +303,5 @@ window.DOORS_CONFIG = DOORS_CONFIG;
 window.DOOR_HITBOXES = DOOR_HITBOXES;
 window.ENEMIES_CONFIG = ENEMIES_CONFIG;
 window.NIGHTS_CONFIG = NIGHTS_CONFIG;
+window.HOURLY_BUMPS = HOURLY_BUMPS;
 window.GAME_CONSTANTS = GAME_CONSTANTS;

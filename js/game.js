@@ -35,8 +35,15 @@ class Game {
     this.viewIndex = 0;
     this.slide = null; // { from, to, dir, t } enquanto o giro está animando
 
+    // Tablet de reboot das câmeras (só abre na visão com `tablet: true`).
+    this.tabletOpen = false;
+    // Freddy dentro da sala: { noMaskMs, maskMs } enquanto acontece, senão null.
+    this.freddyEncounter = null;
+    this.maskOn = false;
+
     UI.buildCameraTabs(window.ROOMS, (roomId) => this.switchCameraRoom(roomId));
     UI.applyMonitorButtonIcons();
+    UI.applyTabletMaskIcons();
     this._resizeCanvas();
     this._setupInputs();
   }
@@ -53,10 +60,12 @@ class Game {
   _setupInputs() {
     window.addEventListener('resize', () => this._resizeCanvas());
 
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-action="turn"]');
-      if (btn) this.turn(Number(btn.dataset.dir));
-    });
+    // Setas de virar: agem ao passar o mouse (uma vez por entrada).
+    // pointerenter não borbulha, por isso o listener é de captura no document.
+    document.addEventListener('pointerenter', (e) => {
+      const btn = e.target.closest && e.target.closest('[data-action="turn"]');
+      if (btn) UI.hoverAct(() => this.turn(Number(btn.dataset.dir)));
+    }, true);
   }
 
   /** Liga/desliga o filtro CSS do monitor (classe .cam-feed, definida em ui.js). */
@@ -67,6 +76,7 @@ class Game {
   /** dir > 0 = virar à direita, dir < 0 = virar à esquerda. Dá a volta (0→1→2→0). */
   turn(dir) {
     if (this.state !== 'playing' || this.cameras.isOpen || this.power.isBlackedOut || this.slide) return;
+    if (this.tabletOpen || this.freddyEncounter) return;
     const n = window.VIEWS.length;
     const step = dir > 0 ? 1 : -1;
     const from = this.viewIndex;
@@ -94,6 +104,10 @@ class Game {
 
     this.viewIndex = 0;
     this.slide = null;
+    this.tabletOpen = false;
+    this.freddyEncounter = null;
+    this.maskOn = false;
+    UI.hideExtraOverlays();
     this._setCameraFeed(false);
 
     this.state = 'playing';
@@ -133,7 +147,15 @@ class Game {
       const aggression = Object.fromEntries(window.ENEMIES_CONFIG.map((e) => [e.id, level]));
       return { label: 'Modo Infinito', aggression, powerDrainMultiplier: c.INFINITE_POWER_MULT };
     }
-    return window.NIGHTS_CONFIG[this.nightIndex];
+    // Campanha: nível-base da noite + bônus por hora (como no FNAF 1).
+    const base = window.NIGHTS_CONFIG[this.nightIndex];
+    const hourMs = c.NIGHT_DURATION_MS / c.HOURS_PER_NIGHT;
+    const hour = Math.floor(this.elapsedNightMs / hourMs);
+    const aggression = { ...base.aggression };
+    for (const [id, hours] of Object.entries(window.HOURLY_BUMPS || {})) {
+      aggression[id] = (aggression[id] || 0) + hours.filter((h) => hour >= h).length;
+    }
+    return { ...base, aggression };
   }
 
   /** Só dá pra mexer na porta/janela da visão em que o jogador está olhando. */
@@ -155,7 +177,8 @@ class Game {
 
   toggleMonitor() {
     if (this.state !== 'playing' || this.power.isBlackedOut) return;
-    // Abrir só na visão marcada com monitorButton (Porta). Fechar vale em qualquer caso.
+    if (this.freddyEncounter || this.tabletOpen) return;
+    // Abrir só na visão marcada com monitorButton (Computador). Fechar vale em qualquer caso.
     if (!this.cameras.isOpen && !this.viewDef.monitorButton) return;
 
     // BUG CORRIGIDO: antes era `this.cameras.toggle(true)`, que SEMPRE abre —
@@ -175,6 +198,102 @@ class Game {
     UI.syncControls(this);
   }
 
+  /** Abre/fecha o tablet de reboot. Só abre na visão com `tablet: true` (Sistema). */
+  toggleTablet() {
+    if (this.state !== 'playing' || this.power.isBlackedOut || this.freddyEncounter) return;
+    if (this.cameras.isOpen) return;
+    if (!this.tabletOpen && !this.viewDef.tablet) return;
+
+    this.tabletOpen = !this.tabletOpen;
+    this.slide = null;
+    UI.setTabletVisible(this.tabletOpen);
+    document.getElementById('office-controls').classList.toggle('hidden', this.tabletOpen);
+    if (this.tabletOpen) this.assetLoader.playSfx('cameraStatic', { volume: 0.25 });
+    UI.syncControls(this);
+  }
+
+  /** Botão "Reiniciar câmeras" do tablet. */
+  rebootCameras() {
+    if (this.state !== 'playing' || !this.tabletOpen) return;
+    if (this.cameras.startReboot()) {
+      this.assetLoader.playSfx('cameraStatic', { volume: 0.4 });
+    }
+  }
+
+  /** Coloca/tira a máscara. Só faz sentido com o Freddy na sala. */
+  toggleMask() {
+    if (this.state !== 'playing' || !this.freddyEncounter) return;
+    if (this.view !== 'porta') return; // a máscara só existe na vista da porta
+    this.maskOn = !this.maskOn;
+    UI.setMask(this.maskOn);
+    UI.syncControls(this);
+  }
+
+  /** Freddy entrou: puxa o jogador para a vista da porta e começa a contagem. */
+  _startFreddyEncounter(enemyId) {
+    this.freddyEncounter = { id: enemyId, noMaskMs: 0, maskMs: 0 };
+    this.maskOn = false;
+    UI.setMask(false);
+
+    if (this.cameras.isOpen) {
+      this.cameras.close();
+      this._setCameraFeed(false);
+      document.getElementById('camera-monitor').classList.add('hidden');
+    }
+    if (this.tabletOpen) {
+      this.tabletOpen = false;
+      UI.setTabletVisible(false);
+    }
+    if (!this.power.isBlackedOut) {
+      document.getElementById('office-controls').classList.remove('hidden');
+    }
+
+    // Vai direto para a vista da porta, pelo caminho mais curto.
+    const views = window.VIEWS;
+    const to = views.findIndex((v) => v.id === 'porta');
+    const from = this.viewIndex;
+    if (to >= 0 && to !== from) {
+      const n = views.length;
+      const forward = (to - from + n) % n;
+      this.viewIndex = to;
+      this.slide = this.constants.VIEW_TRANSITION_MS > 0
+        ? { from, to, dir: forward <= n / 2 ? 1 : -1, t: 0 }
+        : null;
+    }
+    this.assetLoader.playSfx('risada', { volume: 0.7 });
+    UI.syncControls(this);
+  }
+
+  /** Retorna true se o Freddy acabou de fazer o jumpscare. */
+  _updateFreddyEncounter(deltaMs) {
+    const enc = this.freddyEncounter;
+    if (!enc) return false;
+    const c = this.constants;
+
+    if (this.maskOn) {
+      enc.noMaskMs = 0;
+      enc.maskMs += deltaMs;
+      if (enc.maskMs >= c.FREDDY_LEAVE_MS) {
+        // Freddy desiste e volta ao começo da rota.
+        this.freddyEncounter = null;
+        this.maskOn = false;
+        UI.setMask(false);
+        this.enemies.release(enc.id, c.ENEMY_RETREAT_COOLDOWN_MS);
+        UI.syncControls(this);
+      }
+      return false;
+    }
+
+    enc.maskMs = 0;
+    enc.noMaskMs += deltaMs;
+    if (enc.noMaskMs >= c.FREDDY_MASK_GRACE_MS) {
+      const id = enc.id;
+      this.freddyEncounter = null;
+      return this._triggerJumpscare(id);
+    }
+    return false;
+  }
+
   switchCameraRoom(roomId) {
     if (this.state !== 'playing' || !this.cameras.isOpen) return;
     this.cameras.switchRoom(roomId);
@@ -186,6 +305,8 @@ class Game {
   _onBlackout() {
     Object.values(this.doors).forEach((d) => { d.isClosed = false; });
     this.cameras.close();
+    this.tabletOpen = false;
+    UI.setTabletVisible(false);
     this._setCameraFeed(false);
     document.getElementById('camera-monitor').classList.add('hidden');
     document.getElementById('office-controls').classList.add('hidden');
@@ -198,10 +319,18 @@ class Game {
     // Modo Admin: god mode ignora o ataque e só reseta os inimigos.
     if (this.godMode) {
       this.enemies.reset();
+      this.freddyEncounter = null;
+      this.maskOn = false;
+      UI.setMask(false);
+      UI.syncControls(this);
       return false;
     }
 
     this.state = 'jumpscare';
+    this.freddyEncounter = null;
+    this.maskOn = false;
+    this.tabletOpen = false;
+    UI.hideExtraOverlays();
     this._setCameraFeed(false);
     const overlays = UI.renderJumpscare(this.bufferCtx, this.buffer, this.assetLoader, enemyId);
     this._blitBuffer();
@@ -240,6 +369,10 @@ class Game {
 
   _onVictory() {
     this.state = 'victory';
+    this.freddyEncounter = null;
+    this.maskOn = false;
+    this.tabletOpen = false;
+    UI.hideExtraOverlays();
     this._setCameraFeed(false);
     UI.setEnemyOverlays([]);
     this.assetLoader.playSfx('victory');
@@ -289,24 +422,29 @@ class Game {
 
     const night = this._currentNight();
 
-    const lockedJumpscare = this.enemies.updateLocks(deltaMs, this.doors);
-    if (lockedJumpscare && this._triggerJumpscare(lockedJumpscare)) return;
+    // Sistema de câmeras: cai sozinho; o reboot avança aqui.
+    this.cameras.update(deltaMs);
 
-    this.power.tick(deltaMs / 1000, Object.values(this.doors), this.cameras.isOpen, night.powerDrainMultiplier);
-
-    this.aiTickAccumulator += deltaMs;
-    while (this.aiTickAccumulator >= this.constants.AI_TICK_INTERVAL_MS) {
-      this.aiTickAccumulator -= this.constants.AI_TICK_INTERVAL_MS;
-      const jumpscaredBy = this.enemies.tickAll({
-        doors: this.doors,
-        cameraSystem: this.cameras,
-        nightAggression: night.aggression,
-        constants: this.constants,
-        tickIntervalMs: this.constants.AI_TICK_INTERVAL_MS,
-        assetLoader: this.assetLoader,
-      });
-      if (jumpscaredBy && this._triggerJumpscare(jumpscaredBy)) return;
+    const lock = this.enemies.updateLocks(deltaMs, this.doors);
+    if (lock) {
+      if (lock.type === 'intrude') this._startFreddyEncounter(lock.id);
+      else if (this._triggerJumpscare(lock.id)) return;
     }
+    if (this._updateFreddyEncounter(deltaMs)) return;
+
+    const extraDrain = this.tabletOpen ? this.constants.POWER_DRAIN_TABLET_PER_SEC : 0;
+    this.power.tick(
+      deltaMs / 1000, Object.values(this.doors), this.cameras.isOpen,
+      night.powerDrainMultiplier, extraDrain,
+    );
+
+    // Cada inimigo tem o próprio intervalo de movimento (ver moveIntervalMs).
+    this.enemies.tickAll({
+      deltaMs,
+      nightAggression: night.aggression,
+      assetLoader: this.assetLoader,
+      defaultIntervalMs: this.constants.AI_TICK_INTERVAL_MS,
+    });
 
     if (this.mode !== 'infinite' && this.elapsedNightMs >= this.constants.NIGHT_DURATION_MS) {
       this._onVictory(); return;
@@ -322,6 +460,7 @@ class Game {
     }
     this._blitBuffer();
     UI.setEnemyOverlays(overlays);
+    if (this.tabletOpen) UI.updateTablet(this.cameras);
 
     const clockLabel = this.mode === 'infinite'
       ? window.Progression.formatTime(this.elapsedNightMs)

@@ -2,7 +2,7 @@
  * Ativa com Ctrl+Shift+D (ou ?admin=1 na URL). Não depende da ordem de boot:
  * cada comando só age se window.game já existir.
  *
- *  1-5     pula direto para a noite N (campanha)
+ *  1-6     pula direto para a noite N (campanha)
  *  N       pula a noite atual (vitória instantânea)
  *  E       energia para 100%
  *  G       liga/desliga god mode (imune a jumpscare — precisa do godMode
@@ -86,7 +86,7 @@
       hud.innerHTML =
         `<b>ADMIN</b> · ${game.mode} · noite ${game.nightIndex + 1}<br>` +
         `energia <b>${game.power.percentage.toFixed(0)}%</b> ${godMode ? '· <b>GOD</b>' : ''}<br>` +
-        `<span class="k">1-5</span> noite · <span class="k">N</span> pular · ` +
+        `<span class="k">1-6</span> noite · <span class="k">N</span> pular · ` +
         `<span class="k">E</span> energia · <span class="k">G</span> god<br>` +
         `<span class="k">H</span> hitboxes · <span class="k">J</span> jumpscare · <span class="k">C</span> log`;
     });
@@ -97,7 +97,7 @@
     if (!enabled) return;
     if (e.target && e.target.matches && e.target.matches('input,textarea')) return;
 
-    if (/^Digit[1-5]$/.test(e.code)) goToNight(Number(e.code.slice(5)));
+    if (/^Digit[1-6]$/.test(e.code)) goToNight(Number(e.code.slice(5)));
     else if (e.code === 'KeyN') skipNight();
     else if (e.code === 'KeyE') refillPower();
     else if (e.code === 'KeyG') toggleGod();

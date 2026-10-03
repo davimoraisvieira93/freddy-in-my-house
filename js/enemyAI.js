@@ -33,8 +33,12 @@ class Enemy {
     this.doorTimer = null;
     this.lockTimer = 0;
     this.cooldownMs = 0;
+    this.tickAcc = 0;
   }
 }
+
+// Nó especial: o inimigo está DENTRO da sala (só o Freddy, ver game.js).
+const INSIDE_NODE = 'sala';
 
 class EnemyManager {
   constructor(config) {
@@ -62,11 +66,34 @@ class EnemyManager {
     return e ? { node: e.node, entryDoorId: EnemyManager.entryDoorId(e.node) } : null;
   }
 
-  /** Resolve, a cada frame, as mecânicas de entrada (porta/janela) e de trava. */
+  /** O inimigo entra na sala (Freddy). Fica parado até game.js liberá-lo. */
+  intrude(id) {
+    const e = this.list.find((x) => x.id === id);
+    if (!e) return;
+    e.node = INSIDE_NODE;
+    e.doorTimer = null;
+    e.lockTimer = 0;
+  }
+
+  /** O inimigo vai embora: volta ao início da rota e espera um cooldown. */
+  release(id, cooldownMs) {
+    const e = this.list.find((x) => x.id === id);
+    if (!e) return;
+    e.reset();
+    e.cooldownMs = cooldownMs || 0;
+  }
+
+  /**
+   * Resolve, a cada frame, as mecânicas de entrada (porta/janela) e de trava.
+   * Retorna null, { type: 'jumpscare', id } ou { type: 'intrude', id }.
+   * Nenhum som é tocado aqui: os inimigos chegam e saem em silêncio.
+   */
   updateLocks(deltaMs, doors) {
     const c = window.GAME_CONSTANTS;
     for (const e of this.list) {
       if (e.cooldownMs > 0) e.cooldownMs = Math.max(0, e.cooldownMs - deltaMs);
+
+      if (e.node === INSIDE_NODE) continue; // dentro da sala: game.js decide
 
       if (e.cfg.lockNode && e.node === e.cfg.lockNode.nodeId) {
         const door = doors[e.cfg.lockNode.doorId];
@@ -75,8 +102,8 @@ class EnemyManager {
         } else {
           e.lockTimer += deltaMs;
           if (e.lockTimer >= e.cfg.lockNode.timeoutMs) {
-            e.reset();
-            return e.id;
+            this.intrude(e.id);
+            return { type: 'intrude', id: e.id };
           }
         }
         continue;
@@ -86,24 +113,24 @@ class EnemyManager {
       if (entryDoorId !== null) {
         const door = doors[entryDoorId];
 
-        if (!e.doorTimer) {
-          e.doorTimer = { elapsed: 0 };
-          const al = window.game && window.game.assetLoader;
-          if (al) al.playSfx('knock', { volume: 0.6 });
-        }
+        // openMs = tempo com a entrada ABERTA (conta para o ataque);
+        // closedMs = tempo com ela FECHADA (conta para ele desistir).
+        if (!e.doorTimer) e.doorTimer = { openMs: 0, closedMs: 0 };
 
         if (door && door.isClosed) {
-          e.doorTimer.elapsed += deltaMs;
-          if (e.doorTimer.elapsed >= c.DOOR_KNOCK_RETREAT_MS) {
+          e.doorTimer.openMs = 0;
+          e.doorTimer.closedMs += deltaMs;
+          if (e.doorTimer.closedMs >= c.DOOR_KNOCK_RETREAT_MS) {
             e.reset();
             e.cooldownMs = c.ENEMY_RETREAT_COOLDOWN_MS;
           }
         } else {
-          e.doorTimer.elapsed += deltaMs;
-          if (e.doorTimer.elapsed >= c.DOOR_ATTACK_GRACE_MS) {
+          e.doorTimer.closedMs = 0;
+          e.doorTimer.openMs += deltaMs;
+          if (e.doorTimer.openMs >= c.DOOR_ATTACK_GRACE_MS) {
             const id = e.id;
             e.reset();
-            return id;
+            return { type: 'jumpscare', id };
           }
         }
       }
@@ -111,26 +138,41 @@ class EnemyManager {
     return null;
   }
 
-  /** Chamado a cada AI_TICK_INTERVAL_MS. Move os inimigos pelo grafo. */
-  tickAll({ nightAggression, assetLoader }) {
+  /**
+   * Chamado a cada frame. Cada inimigo tem o próprio intervalo de movimento
+   * (cfg.moveIntervalMs, como no FNAF 1; senão defaultIntervalMs) e, a cada
+   * intervalo, rola um dado: se tirar menos que o nível de agressão (0-20),
+   * avança pelo grafo.
+   */
+  tickAll({ deltaMs, nightAggression, assetLoader, defaultIntervalMs }) {
     for (const e of this.list) {
-      if (e.cooldownMs > 0) continue;
-      if (e.cfg.lockNode && e.node === e.cfg.lockNode.nodeId) continue;
-      if (EnemyManager.entryDoorId(e.node) !== null) continue;
-
-      const level = nightAggression?.[e.id] ?? 0;
-      if (level <= 0) continue;
-      if (Math.random() > level / 20) continue; // escala 0-20 (teto do FNAF)
-
-      const options = e.cfg.graph[e.node] || [];
-      if (!options.length) continue;
-
-      e.node = options[(Math.random() * options.length) | 0];
-      e.doorTimer = null;
-
-      if (e.cfg.onMoveSfx && assetLoader) assetLoader.playSfx(e.cfg.onMoveSfx, { volume: 0.5 });
+      const interval = e.cfg.moveIntervalMs || defaultIntervalMs || 5000;
+      e.tickAcc += deltaMs;
+      while (e.tickAcc >= interval) {
+        e.tickAcc -= interval;
+        this._tryMove(e, nightAggression, assetLoader);
+      }
     }
-    return null; // jumpscares de movimento passam por updateLocks no frame seguinte
+    return null; // ataques passam por updateLocks no frame seguinte
+  }
+
+  _tryMove(e, nightAggression, assetLoader) {
+    if (e.cooldownMs > 0) return;
+    if (e.node === INSIDE_NODE) return;
+    if (e.cfg.lockNode && e.node === e.cfg.lockNode.nodeId) return;
+    if (EnemyManager.entryDoorId(e.node) !== null) return;
+
+    const level = nightAggression?.[e.id] ?? 0;
+    if (level <= 0) return;
+    if (Math.random() >= level / 20) return; // escala 0-20 (teto do FNAF)
+
+    const options = e.cfg.graph[e.node] || [];
+    if (!options.length) return;
+
+    e.node = options[(Math.random() * options.length) | 0];
+    e.doorTimer = null;
+
+    if (e.cfg.onMoveSfx && assetLoader) assetLoader.playSfx(e.cfg.onMoveSfx, { volume: 0.5 });
   }
 }
 

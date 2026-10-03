@@ -62,6 +62,7 @@
   bridge('DOOR_HITBOXES',  () => DOOR_HITBOXES);
   bridge('ENEMIES_CONFIG', () => ENEMIES_CONFIG);
   bridge('NIGHTS_CONFIG',  () => NIGHTS_CONFIG);
+  bridge('HOURLY_BUMPS',   () => HOURLY_BUMPS);
   bridge('Progression',    () => Progression);
 
   if (bridged.length) {
@@ -202,6 +203,7 @@
     hide('hud');
     hide('office-controls');
     hide('camera-monitor');
+    if (UI.hideExtraOverlays) UI.hideExtraOverlays();
     if (UI.setEnemyOverlays) UI.setEnemyOverlays([]);
     resumeMenuMusic();
     if (window.refreshMenu) window.refreshMenu();
@@ -262,11 +264,16 @@
     document.querySelectorAll('[data-action="toggle-door"]').forEach((btn) => {
       btn.addEventListener('click', () => game && game.toggleDoor(btn.dataset.door));
     });
-    on('btn-open-monitor', 'click', () => game && game.toggleMonitor());
+    // Câmeras e máscara agem ao passar o mouse (uma vez por entrada).
+    on('btn-open-monitor', 'pointerenter', () => UI.hoverAct(() => game && game.toggleMonitor()));
+    on('btn-open-tablet', 'click', () => game && game.toggleTablet());
+    on('btn-mask', 'pointerenter', () => UI.hoverAct(() => game && game.toggleMask()));
+    on('btn-close-tablet', 'click', () => game && game.toggleTablet());
+    on('btn-reboot-cameras', 'click', () => game && game.rebootCameras());
   }
 
   function wireCameraMonitor() {
-    on('btn-close-monitor', 'click', () => game && game.toggleMonitor());
+    on('btn-close-monitor', 'pointerenter', () => UI.hoverAct(() => game && game.toggleMonitor()));
   }
 
   function wireEndScreens() {
@@ -293,7 +300,13 @@
       if (k === 'arrowright') { e.preventDefault(); game.turn(1); }
       if (k === 'a') game.toggleDoor('porta');
       if (k === 'd') game.toggleDoor('janela');
-      if (k === ' ') { e.preventDefault(); game.toggleMonitor(); }
+      if (k === 'm') game.toggleMask();
+      if (k === ' ') {
+        e.preventDefault();
+        // Na vista do Sistema o Espaço abre/fecha o tablet; nas demais, o monitor.
+        if (game.tabletOpen || game.viewDef.tablet) game.toggleTablet();
+        else game.toggleMonitor();
+      }
     });
   }
 })();

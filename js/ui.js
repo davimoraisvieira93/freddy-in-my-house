@@ -68,6 +68,35 @@
       filter: none;
     }
 
+    /* Máscara do Freddy: PNG em tela cheia por cima do jogo (abaixo do HUD). */
+    #mask-overlay { position: absolute; inset: 0; z-index: 8; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,.35) 30%, rgba(0,0,0,.92) 100%); }
+    #mask-overlay img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    /* Mesmo estilo/posição do botão de câmeras, mas ao lado dele (à direita). */
+    #btn-mask { position: absolute; bottom: 24px; left: 50%; margin-left: 70px;
+      font-size: 15px; padding: 12px 20px; }
+    #btn-mask.active { border-color: #3fae5c; color: #3fae5c; }
+    #btn-mask img.btn-icon, #btn-open-tablet img.btn-icon {
+      display: block; width: 10vw; max-width: 90px; min-width: 48px; height: auto; object-fit: contain; }
+    #btn-open-tablet { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      font-size: 15px; padding: 12px 20px; }
+
+    /* Tablet de reboot das câmeras (só abre na vista do Sistema). */
+    #reboot-tablet { position: absolute; inset: 0; z-index: 12; display: flex;
+      align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+    #reboot-tablet .tablet-panel { width: min(460px, 90vw); background: #0d1210;
+      border: 2px solid #2d5c3c; border-radius: 10px; padding: 22px; text-align: center;
+      font-family: monospace; box-shadow: 0 0 40px rgba(0,0,0,.8); }
+    #reboot-tablet h2 { margin: 0 0 12px; font: 400 22px Georgia, serif; }
+    #tablet-status { font-size: 15px; margin-bottom: 12px; }
+    #tablet-status.ok { color: #3fae5c; }
+    #tablet-status.down { color: #c23b3b; animation: pulse 1s infinite; }
+    #tablet-status.rebooting { color: #d9a441; }
+    .tablet-bar { height: 12px; background: #1c2a22; border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+    #tablet-bar-fill { height: 100%; width: 0; background: #d9a441; transition: width .1s linear; }
+    #reboot-tablet .tablet-buttons { display: flex; gap: 10px; justify-content: center; }
+    #reboot-tablet button:disabled { opacity: .45; cursor: not-allowed; }
+
     /* "● REC Câm. N" em DOM: fica acima dos sprites em tela cheia */
     #cam-rec-label { position: absolute; top: 16px; left: 20px; z-index: 12;
       color: #3fae5c; font: bold 16px monospace; text-shadow: 0 1px 3px #000;
@@ -179,23 +208,106 @@ const UI = (() => {
 
   // ---------------------------------------------------- controles do escritório
   function syncControls(game) {
-    const blocked = game.cameras.isOpen || game.power.isBlackedOut;
+    const encounter = !!game.freddyEncounter;
+    const blocked = game.cameras.isOpen || game.power.isBlackedOut || game.tabletOpen;
     const view = game.viewDef;
 
     // botão do monitor: só nas visões marcadas com monitorButton em VIEWS
     const monitorBtn = document.getElementById('btn-open-monitor');
-    if (monitorBtn) monitorBtn.classList.toggle('hidden', blocked || !view.monitorButton);
+    if (monitorBtn) monitorBtn.classList.toggle('hidden', blocked || encounter || !view.monitorButton);
+
+    // botão do tablet: só na visão marcada com tablet: true (Sistema)
+    const tabletBtn = document.getElementById('btn-open-tablet');
+    if (tabletBtn) tabletBtn.classList.toggle('hidden', blocked || encounter || !view.tablet);
+
+    // botão da máscara: só enquanto o Freddy está na sala
+    const maskBtn = document.getElementById('btn-mask');
+    if (maskBtn) {
+      maskBtn.classList.toggle('hidden', !encounter || view.id !== 'porta');
+      maskBtn.classList.toggle('active', !!game.maskOn);
+    }
 
     // painel de porta/janela: só na visão que controla aquela porta
     document.querySelectorAll('.door-panel').forEach((panel) => {
       panel.classList.toggle('hidden', blocked || panel.dataset.door !== view.doorId);
     });
 
-    // setas de virar
+    // setas de virar (travadas com o Freddy na sala)
     ['nav-left', 'nav-right'].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.classList.toggle('hidden', blocked);
+      if (el) el.classList.toggle('hidden', blocked || encounter);
     });
+  }
+
+  // ------------------------------------------------------ ação por hover
+  // Botões acionados ao passar o mouse: o evento pointerenter já dispara uma
+  // única vez por entrada (ficar parado em cima não repete; tem que sair e
+  // entrar de novo). A trava curta evita que um botão que aparece debaixo do
+  // ponteiro (ex.: abrir câmeras -> fechar monitor, no mesmo lugar) dispare
+  // na hora e fique abrindo/fechando em loop.
+  let hoverLockUntil = 0;
+  function hoverAct(fn) {
+    const now = performance.now();
+    if (now < hoverLockUntil) return;
+    hoverLockUntil = now + 450;
+    fn();
+  }
+
+  // ------------------------------------------------- máscara e tablet (DOM)
+  /** Mostra/esconde a máscara (PNG ui.mask; sem arquivo vira uma vinheta escura). */
+  function setMask(on) {
+    let el = document.getElementById('mask-overlay');
+    if (!el) {
+      const host = document.getElementById('game-container');
+      if (!host) return;
+      el = document.createElement('div');
+      el.id = 'mask-overlay';
+      el.classList.add('hidden');
+      const src = ((window.ASSETS.images || {}).ui || {}).mask;
+      if (src) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.onerror = () => img.remove();
+        img.src = src;
+        el.appendChild(img);
+      }
+      host.appendChild(el);
+    }
+    el.classList.toggle('hidden', !on);
+  }
+
+  function setTabletVisible(on) {
+    const el = document.getElementById('reboot-tablet');
+    if (el) el.classList.toggle('hidden', !on);
+  }
+
+  /** Atualiza status, barra e botão do tablet (chamado a cada frame com ele aberto). */
+  function updateTablet(cameras) {
+    const status = document.getElementById('tablet-status');
+    const fill = document.getElementById('tablet-bar-fill');
+    const btn = document.getElementById('btn-reboot-cameras');
+    if (!status) return;
+    const labels = {
+      ok: 'SISTEMA DE CÂMERAS: ONLINE',
+      down: 'SISTEMA DE CÂMERAS: FORA DO AR',
+      rebooting: 'REINICIANDO…',
+    };
+    status.textContent = labels[cameras.status] || '';
+    status.className = cameras.status;
+    if (fill) fill.style.width = `${Math.round(cameras.rebootProgress * 100)}%`;
+    if (btn) btn.disabled = cameras.status === 'rebooting';
+  }
+
+  function hideExtraOverlays() {
+    setMask(false);
+    setTabletVisible(false);
+  }
+
+  /** Ícones PNG opcionais da máscara e do tablet (sem arquivo, fica o texto). */
+  function applyTabletMaskIcons() {
+    const ui = (window.ASSETS && window.ASSETS.images && window.ASSETS.images.ui) || {};
+    setButtonImage(document.getElementById('btn-mask'), ui.buttonMask);
+    setButtonImage(document.getElementById('btn-open-tablet'), ui.buttonTablet);
   }
 
   /** Troca o <img> de dentro do botão (cria o <img> na primeira vez).
@@ -390,6 +502,13 @@ const UI = (() => {
     } else {
       drawViewBackground(ctx, buffer, assetLoader, game, game.viewIndex, 0);
       drawDoorLayer(ctx, buffer, assetLoader, game, overlays);
+
+      // Freddy dentro da sala: aparece na vista da porta (a máscara cobre por cima).
+      if (game.freddyEncounter && game.view === 'porta') {
+        const img = assetLoader.getImage('enemies.freddy.naSala');
+        if (img) overlays.push({ src: img.src });
+        else drawPlaceholder(ctx, W * 0.25, H * 0.1, W * 0.5, H * 0.8, 'FREDDY NA SALA — COLOQUE A MÁSCARA!', 'rgba(127,29,29,0.75)');
+      }
     }
 
     if (game.power.isBlackedOut) drawBlackout(ctx, W, H);
@@ -406,6 +525,27 @@ const UI = (() => {
 
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
+
+    // Sistema fora do ar / reiniciando: só chiado e um aviso.
+    if (!game.cameras.isWorking) {
+      setEnemyLayerShake(0, 0);
+      const st = assetLoader.getImage('cameras.static');
+      if (st) drawCover(ctx, st, 0, 0, W, H);
+      drawStaticNoise(ctx, W, H, (c.STATIC_NOISE_DENSITY || 45) * 10);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, H * 0.38, W, H * 0.24);
+      ctx.fillStyle = game.cameras.status === 'down' ? '#c23b3b' : '#d9a441';
+      ctx.font = 'bold 18px monospace';
+      ctx.fillText(game.cameras.status === 'down' ? 'CÂMERAS FORA DO AR' : 'REINICIANDO…', W / 2, H * 0.46);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = '11px monospace';
+      ctx.fillText('Reinicie o sistema pelo tablet (vista à esquerda do computador)', W / 2, H * 0.55);
+      ctx.restore();
+      return overlays;
+    }
 
     // troca de câmera / abertura do monitor: um instante de chiado
     if (performance.now() < flashUntil) {
@@ -538,6 +678,12 @@ const UI = (() => {
     syncControls,
     setDoorButtonsState,
     applyMonitorButtonIcons,
+    applyTabletMaskIcons,
+    hoverAct,
+    setMask,
+    setTabletVisible,
+    updateTablet,
+    hideExtraOverlays,
     applyMenuButtonIcons,
     applyMenuBackground,
     setEnemyOverlays,
