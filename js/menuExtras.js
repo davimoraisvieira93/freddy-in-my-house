@@ -12,14 +12,29 @@
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', !unlocked);
     });
+    // Botão principal continua de onde o jogador parou.
+    const saved = window.Progression.getSavedNight();
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) {
+      const label = `Night ${saved + 1}`;
+      startBtn.dataset.fallbackText = label;          // usado se o PNG falhar
+      if (!startBtn.querySelector('img.btn-icon')) startBtn.textContent = label;
+      startBtn.title = saved > 0 ? `Continuar: ${label}` : 'Começar';
+    }
+    const newBtn = document.getElementById('btn-newgame');
+    if (newBtn) newBtn.classList.toggle('hidden', saved === 0);
+
     UI.applyMenuButtonIcons();
     UI.applyMenuBackground();
-    renderMenuLeaderboard();
   }
   window.refreshMenu = refreshMenu;
 
   function renderMenuLeaderboard() {
-    UI.renderLeaderboard(document.getElementById('menu-leaderboard-list'), null);
+    UI.renderGlobalLeaderboard(
+      document.getElementById('menu-leaderboard-list'),
+      document.getElementById('leaderboard-status'),
+      null,
+    );
   }
 
   function buildCustomLevels() {
@@ -68,6 +83,17 @@
   document.getElementById('btn-leaderboard')?.addEventListener('click', () => {
     renderMenuLeaderboard();
     UI.showScreen('leaderboard-screen');
+  });
+
+  document.getElementById('btn-change-name')?.addEventListener('click', () => {
+    if (window.Leaderboard) window.Leaderboard.askName(true);
+  });
+
+  document.getElementById('btn-newgame')?.addEventListener('click', () => {
+    if (!window.game) return;
+    window.Progression.resetProgress();
+    window.stopMenuMusic();
+    window.game.startNight(0);
   });
 
   document.getElementById('btn-clear-leaderboard')?.addEventListener('click', () => {

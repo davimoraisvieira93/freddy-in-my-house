@@ -5,6 +5,22 @@
 const Progression = {
   _UNLOCK_KEY: 'vigianoturna:unlocked',
   _SCORES_KEY: 'vigianoturna:scores',
+  _NIGHT_KEY: 'vigianoturna:night',
+
+  /** Noite (índice 0-based) em que o jogador parou. 0 = começo. */
+  getSavedNight() {
+    const n = parseInt(localStorage.getItem(this._NIGHT_KEY), 10);
+    const max = (window.NIGHTS_CONFIG ? window.NIGHTS_CONFIG.length : 1) - 1;
+    return Number.isFinite(n) && n > 0 ? Math.min(n, max) : 0;
+  },
+
+  saveNight(index) {
+    try { localStorage.setItem(this._NIGHT_KEY, String(Math.max(0, index | 0))); } catch (e) { /* noop */ }
+  },
+
+  resetProgress() {
+    localStorage.removeItem(this._NIGHT_KEY);
+  },
 
   isUnlocked() {
     return localStorage.getItem(this._UNLOCK_KEY) === '1';

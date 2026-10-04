@@ -78,7 +78,7 @@ class Game {
     if (this.state !== 'playing' || this.cameras.isOpen || this.power.isBlackedOut || this.slide) return;
     if (this.tabletOpen || this.freddyEncounter) return;
     // Virou para outro lado: tira a máscara (ela só existe na vista da porta).
-    if (this.maskOn) { this.maskOn = false; UI.setMask(false); }
+    this._setMask(false);
     const n = window.VIEWS.length;
     const step = dir > 0 ? 1 : -1;
     const from = this.viewIndex;
@@ -98,6 +98,9 @@ class Game {
     this.customLevels = levels || {};
     this.elapsedNightMs = 0;
     this.aiTickAccumulator = 0;
+
+    // Salva em que noite o jogador está: se fechar o site, volta nela.
+    if (mode === 'story') window.Progression.saveNight(this.nightIndex);
 
     Object.values(this.doors).forEach((d) => d.reset());
     this.power.reset();
@@ -222,14 +225,21 @@ class Game {
     }
   }
 
+  /** Muda o estado da máscara e toca o som de colocar/tirar (só se mudou). */
+  _setMask(on) {
+    if (this.maskOn === on) return;
+    this.maskOn = on;
+    UI.setMask(on);
+    this.assetLoader.playSfx(on ? 'maskOn' : 'maskOff', { volume: 0.8 });
+  }
+
   /** Coloca/tira a máscara. Só faz sentido com o Freddy na sala. */
   toggleMask() {
     if (this.state !== 'playing') return;
     if (this.view !== 'porta') return; // a máscara só existe na vista da porta
     if (this.cameras.isOpen || this.tabletOpen) return;
     if (this.power.isBlackedOut && !this.freddyEncounter) return;
-    this.maskOn = !this.maskOn;
-    UI.setMask(this.maskOn);
+    this._setMask(!this.maskOn);
     UI.syncControls(this);
   }
 
@@ -279,8 +289,7 @@ class Game {
       if (enc.maskMs >= c.FREDDY_LEAVE_MS) {
         // Freddy desiste e volta ao começo da rota.
         this.freddyEncounter = null;
-        this.maskOn = false;
-        UI.setMask(false);
+        this._setMask(false);
         this.enemies.release(enc.id, c.ENEMY_RETREAT_COOLDOWN_MS);
         UI.syncControls(this);
       }
@@ -346,7 +355,8 @@ class Game {
     let result = null;
     if (this.mode === 'infinite') {
       const ms = this.elapsedNightMs;
-      result = { ms, rank: window.Progression.addScore(ms) };
+      window.Progression.addScore(ms); // cópia local (vale offline)
+      result = { ms };
     }
     setTimeout(() => this._onGameOver(result), 2200);
     return true;
@@ -362,12 +372,33 @@ class Game {
       if (result) {
         document.getElementById('gameover-time').textContent =
           `Você sobreviveu ${window.Progression.formatTime(result.ms)}`;
-        document.getElementById('gameover-rank').textContent =
-          result.rank ? `Nova marca: #${result.rank} no ranking!` : '';
-        UI.renderLeaderboard(document.getElementById('gameover-leaderboard'), result.rank);
+        document.getElementById('gameover-rank').textContent = '';
       }
     }
     UI.showScreen('gameover-screen');
+    if (result) this._finishInfinite(result);
+  }
+
+  /** Envia a marca ao ranking geral (ou guarda na fila se estiver offline). */
+  async _finishInfinite(result) {
+    const LB = window.Leaderboard;
+    const rankEl = document.getElementById('gameover-rank');
+    const list = document.getElementById('gameover-leaderboard');
+    const status = document.getElementById('gameover-status');
+
+    const online = !!(LB && LB.enabled());
+    const name = online ? LB.askName(false) : ((LB && LB.getName()) || 'Você');
+    const sent = online ? await LB.submit(result.ms, name) : { status: 'disabled' };
+    const rank = await UI.renderGlobalLeaderboard(list, status, { name, ms: result.ms });
+
+    if (!rankEl) return;
+    if (sent.status === 'queued') {
+      rankEl.textContent = 'Sem conexão: sua marca será enviada quando voltar online.';
+    } else if (rank) {
+      rankEl.textContent = online
+        ? `Você está em #${rank} no ranking geral!`
+        : `Nova marca: #${rank} no ranking local!`;
+    }
   }
 
   _onVictory() {
@@ -385,6 +416,9 @@ class Game {
     let title;
 
     if (isStory) {
+      // Passou da noite: o próximo "Continuar" já abre a seguinte (ou recomeça).
+      if (isLast) window.Progression.resetProgress();
+      else window.Progression.saveNight(this.nightIndex + 1);
       title = isLast
         ? 'Você sobreviveu a todas as noites!'
         : `${window.NIGHTS_CONFIG[this.nightIndex].label} concluída — são 6 da manhã!`;

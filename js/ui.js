@@ -57,6 +57,7 @@
     .custom-level-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: #ddd; font: 13px monospace; }
     .leaderboard li.highlight { color: #4caf50; font-weight: bold; }
     .leaderboard li.empty { color: #888; }
+    .lb-status { color: #8b8f9a; font: 13px monospace; margin: 0; min-height: 1.2em; }
     .dev-hud { position: fixed; left: 10px; bottom: 10px; z-index: 9999;
       font: 12px/1.5 monospace; color: #b9f5c8; background: rgba(6,10,8,.88);
       border: 1px solid #2d5c3c; border-radius: 6px; padding: 8px 10px; }
@@ -677,6 +678,67 @@ const UI = (() => {
     if (el.getAttribute('src') !== src) el.src = src;
   }
 
+  /**
+   * Ranking GERAL do Modo Infinito. Mostra primeiro a cópia salva (rápido),
+   * depois atualiza pela internet. Sem internet: última cópia; sem nada,
+   * o ranking local. Retorna a posição de `highlight` ({name, ms}) ou null.
+   */
+  async function renderGlobalLeaderboard(el, statusEl, highlight) {
+    if (!el) return null;
+    const LB = window.Leaderboard;
+    const fmt = (ms) => window.Progression.formatTime(ms);
+    const setStatus = (txt) => { if (statusEl) statusEl.textContent = txt; };
+
+    const draw = (list) => {
+      el.innerHTML = '';
+      if (!list.length) {
+        const li = document.createElement('li');
+        li.className = 'empty';
+        li.textContent = 'Nenhum registro ainda';
+        el.appendChild(li);
+        return null;
+      }
+      let rank = null;
+      list.forEach((e, i) => {
+        const li = document.createElement('li');
+        li.textContent = `${e.name} — ${fmt(e.ms)}`;
+        if (highlight && e.name === highlight.name && e.ms === highlight.ms && rank === null) {
+          li.className = 'highlight';
+          rank = i + 1;
+        }
+        el.appendChild(li);
+      });
+      return rank;
+    };
+
+    const localList = () => window.Progression.getLeaderboard()
+      .map((ms) => ({ name: (LB && LB.getName()) || 'Você', ms }));
+
+    if (!LB || !LB.enabled()) {
+      setStatus('○ Ranking local (o ranking geral ainda não foi configurado)');
+      return draw(localList());
+    }
+
+    const cached = LB.getCached();
+    if (cached.length) draw(cached);
+    setStatus('Atualizando ranking geral…');
+
+    if (!navigator.onLine) {
+      setStatus('○ Offline — mostrando o último ranking geral salvo');
+      return draw(cached.length ? cached : localList());
+    }
+    try {
+      const list = await LB.fetchTop();
+      const rank = draw(list);
+      const pend = LB.pendingCount();
+      setStatus(pend ? `● Online — ${pend} marca(s) aguardando envio` : '● Online — ranking geral');
+      return rank;
+    } catch (e) {
+      setStatus('○ Sem conexão com o ranking — mostrando o último salvo');
+      return draw(cached.length ? cached : localList());
+    }
+  }
+
   function renderLeaderboard(el, highlightRank) {
     if (!el) return;
     const scores = window.Progression.getLeaderboard();
@@ -711,6 +773,7 @@ const UI = (() => {
     drawStaticNoise,
     updateHud,
     renderLeaderboard,
+    renderGlobalLeaderboard,
     setVictoryGif,
   };
 })();

@@ -92,6 +92,8 @@ const ASSETS = {
     jumpscare: 'assets/audio/sfx/jumpscare.mp3',
     victory: 'assets/audio/sfx/victory_6am.mp3',
     risada: 'assets/audio/sfx/risada.mp3',
+    maskOn: 'assets/audio/sfx/mask_on.mp3',    // NOVO — som ao COLOCAR a máscara
+    maskOff: 'assets/audio/sfx/mask_off.mp3',  // NOVO — som ao TIRAR a máscara
     menuBeatbox: 'assets/audio/sfx/beatbox.mp3'
   },
 };
@@ -296,6 +298,19 @@ const GAME_CONSTANTS = {
   INFINITE_POWER_MULT: 0.6,
 };
 
+// -----------------------------------------------------------------------
+// RANKING GERAL (Modo Infinito) — online.
+// Cole aqui a URL do seu Firebase Realtime Database (passo a passo em
+// SETUP-ONLINE.md). Exemplo: 'https://meu-jogo-default-rtdb.firebaseio.com'
+// Enquanto estiver vazio, o jogo funciona 100% offline com ranking só local.
+// -----------------------------------------------------------------------
+const ONLINE_CONFIG = {
+  databaseUrl: '',
+  path: 'vigianoturna/scores',
+  maxEntries: 10,
+};
+
+window.ONLINE_CONFIG = ONLINE_CONFIG;
 window.ASSETS = ASSETS;
 window.VIEWS = VIEWS;
 window.ROOMS = ROOMS;

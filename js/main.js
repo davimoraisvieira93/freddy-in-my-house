@@ -256,7 +256,7 @@
     on('btn-start', 'click', () => {
       if (!game) return;
       stopMenuMusic();
-      game.startNight(0);
+      game.startNight(Progression.getSavedNight()); // continua da noite salva
     });
   }
 
