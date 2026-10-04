@@ -278,3 +278,26 @@ button[data-action="toggle-door"].active {
 #gameover-rank { color: var(--accent-power); }
 
 .hidden { display: none !important; }
+
+/* ------------------------------------------------ Menu principal
+   Botões embaixo do título "Freddy's in my House" (canto esquerdo da arte de
+   fundo). Para subir/descer o bloco mude --menu-top; para afastar da borda
+   esquerda mude --menu-left. */
+#menu-screen {
+  --menu-left: 4vw;
+  --menu-top: 42vh;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: var(--menu-top) 0 0 var(--menu-left);
+  gap: 12px;
+}
+
+#menu-screen button { text-align: left; }
+
+/* PNGs dos botões do menu: não passam da largura do título */
+#menu-screen button img.btn-icon {
+  display: block;
+  max-width: min(320px, 28vw);
+  height: auto;
+}
