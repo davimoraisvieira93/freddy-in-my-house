@@ -1,0 +1,9 @@
+{
+  "name": "Freddy's in my Home",
+  "short_name": "Vigia Noturna",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0b0e",
+  "theme_color": "#0a0b0e"
+}

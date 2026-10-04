@@ -54,3 +54,11 @@ Todos opcionais: sem o arquivo, o jogo mostra um placeholder/texto.
 
 Atalhos: **M** = máscara, **Espaço** = monitor (no computador) ou tablet (na vista do Sistema).
 Ajustes de tempo (queda das câmeras, reboot, máscara) ficam em `GAME_CONSTANTS` no `js/config.js`.
+
+## Sons da máscara
+| Quando toca | Caminho esperado |
+|---|---|
+| Ao colocar a máscara | `assets/audio/sfx/mask_on.mp3` |
+| Ao tirar a máscara (inclusive quando ela sai sozinha) | `assets/audio/sfx/mask_off.mp3` |
+
+Ranking online e noite salva: veja `SETUP-ONLINE.md`.

@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Freddy's in my Home</title>
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0a0b0e" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
 </head>
 <body>
   <div id="game-container">
@@ -68,6 +70,7 @@
     <!-- Menu principal -->
     <div id="menu-screen" class="screen hidden">
       <button id="btn-start">Night 1</button>
+      <button id="btn-newgame" class="hidden">Novo Jogo</button>
       <button id="btn-custom"      class="hidden">Custom Night</button>
       <button id="btn-infinite"    class="hidden">Infinit Mode</button>
       <button id="btn-leaderboard" class="hidden">🏆 Ranking</button>
@@ -86,8 +89,10 @@
     <!-- Ranking do Modo Infinito -->
     <div id="leaderboard-screen" class="screen hidden">
       <h2>Melhores tempos — Infinit Mode</h2>
+      <p id="leaderboard-status" class="lb-status"></p>
       <ol id="menu-leaderboard-list" class="leaderboard"></ol>
       <div class="screen-buttons">
+        <button id="btn-change-name">Mudar nome</button>
         <button id="btn-clear-leaderboard">Limpar</button>
         <button data-action="back-to-menu">Voltar</button>
       </div>
@@ -99,6 +104,7 @@
       <div id="gameover-infinite" class="hidden">
         <p id="gameover-time"></p>
         <p id="gameover-rank"></p>
+        <p id="gameover-status" class="lb-status"></p>
         <ol id="gameover-leaderboard" class="leaderboard"></ol>
       </div>
       <div class="screen-buttons">
@@ -121,17 +127,24 @@
        admin.js pode vir em qualquer lugar depois de config.js, pois só
        acessa window.game/window.* dentro dos handlers (tempo de execução,
        não tempo de parse). -->
-  <script src="js/config.js?v=6"></script>
-  <script src="js/progression.js?v=6"></script>
-  <script src="js/assetLoader.js?v=6"></script>
-  <script src="js/doors.js?v=6"></script>
-  <script src="js/power.js?v=6"></script>
-  <script src="js/cameras.js?v=6"></script>
-  <script src="js/enemyAI.js?v=6"></script>
-  <script src="js/ui.js?v=6"></script>
-  <script src="js/game.js?v=6"></script>
-  <script src="js/main.js?v=6"></script>
-  <script src="js/menuExtras.js?v=6"></script>
-  <script src="js/admin.js?v=6"></script>
+  <script src="js/config.js?v=7"></script>
+  <script src="js/progression.js?v=7"></script>
+  <script src="js/online.js?v=7"></script>
+  <script src="js/assetLoader.js?v=7"></script>
+  <script src="js/doors.js?v=7"></script>
+  <script src="js/power.js?v=7"></script>
+  <script src="js/cameras.js?v=7"></script>
+  <script src="js/enemyAI.js?v=7"></script>
+  <script src="js/ui.js?v=7"></script>
+  <script src="js/game.js?v=7"></script>
+  <script src="js/main.js?v=7"></script>
+  <script src="js/menuExtras.js?v=7"></script>
+  <script src="js/admin.js?v=7"></script>
+  <script>
+    // Offline: registra o service worker (só funciona via http/https, não em file://).
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>
