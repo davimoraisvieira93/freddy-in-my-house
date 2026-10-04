@@ -18,6 +18,22 @@ const Progression = {
     try { localStorage.setItem(this._NIGHT_KEY, String(Math.max(0, index | 0))); } catch (e) { /* noop */ }
   },
 
+  /**
+   * Apaga TODOS os dados salvos neste navegador (noite, extras desbloqueados,
+   * ranking local, nome e fila de envio): o jogo volta ao estado de um
+   * computador novo. Não mexe no ranking geral online.
+   */
+  resetAll() {
+    const prefix = 'vigianoturna:';
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+    return keys.length;
+  },
+
   resetProgress() {
     localStorage.removeItem(this._NIGHT_KEY);
   },

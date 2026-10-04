@@ -100,4 +100,18 @@
     window.Progression.clearLeaderboard();
     renderMenuLeaderboard();
   });
+
+  // Ctrl + Shift + Y: apaga todos os dados salvos (começa como num computador novo).
+  window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey && e.shiftKey && e.code === 'KeyY')) return;
+    e.preventDefault();
+    const ok = window.confirm(
+      'Apagar TODOS os dados salvos neste navegador?\n\n' +
+      '• noite em que você parou\n• Custom Night / Modo Infinito / Ranking desbloqueados\n' +
+      '• ranking local e nome\n\nNão dá para desfazer.',
+    );
+    if (!ok) return;
+    window.Progression.resetAll();
+    location.reload(); // recarrega limpo, como um jogo novo
+  });
 })();
