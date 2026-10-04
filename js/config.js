@@ -93,7 +93,7 @@ const ASSETS = {
     victory: 'assets/audio/sfx/victory_6am.mp3',
     risada: 'assets/audio/sfx/risada.mp3',
     maskOn: 'assets/audio/sfx/mask_on.mp3',    // NOVO — som ao COLOCAR a máscara
-    maskOff: 'assets/audio/sfx/mask_off.mp3',  // NOVO — som ao TIRAR a máscara
+    maskOff: 'assets/audio/sfx/mask_off.ogg',  // NOVO — som ao TIRAR a máscara
     menuBeatbox: 'assets/audio/sfx/beatbox.mp3'
   },
 };
